@@ -85,3 +85,257 @@
   - Built for the 21st century web estates
   - Schemaless
   - The most important result of the rise of NoSQL is Polyglot Persistence.
+
+## Chapter 2. Aggregate Data Models
+
+- **Definition of Data Model**: The data model is the method through which we perceive and manipulate our data. It is different from the storage model, which is about how the database stores and manipulates the data internally.
+- **Use of Data Model**: In conversation, the term "data model" often refers to the model of the specific data in an application. However, in the context of this book, "data model" refers to the model by which the database organizes data.
+- **Relational Data Model**: The dominant data model of the last couple of decades is the relational data model, visualized as a set of tables with rows and columns.
+- **Shift to NoSQL**: NoSQL represents a shift away from the relational model. Each NoSQL solution uses a different model, categorized into four types: key-value, document, column-family, and graph.
+- **Aggregate Orientation**: The first three NoSQL models (key-value, document, column-family) share a common characteristic called aggregate orientation.
+
+### 2.1. Aggregates
+
+- **Relational Model**: This model divides information into tuples or rows. It's a simple structure that doesn't allow for nesting of tuples or lists within tuples.
+- **Aggregate Orientation**: This approach allows for more complex data structures. It's useful for operating on data units that have a more complex structure than a set of tuples.
+- **Key-Value, Document, and Column-Family Databases**: These databases use the aggregate orientation approach. They handle operations on a cluster more easily due to the aggregate structure.
+- **Domain-Driven Design**: The term "aggregate" comes from this design approach. An aggregate is a collection of related objects treated as a unit for data manipulation and consistency management.
+- **Aggregates and Database Operations**: Aggregates make it easier for databases to handle operations like replication and sharding. They are also easier for programmers to work with as they often manipulate data through aggregate structures.
+
+#### 2.1.1. Example of Relations and Aggregates
+
+Let’s assume we have to build an e-commerce website; we are going to be selling items directly to customers over the web, and we will have to store information about users, our product catalog, orders, shipping addresses, billing addresses, and payment data. We can use this scenario to model the data using a relation data store as well as NoSQL data stores and talk about their pros and cons.
+
+##### Relational Model
+
+```mermaid
+classDiagram
+    Customer "1" -- "*" Order
+    Customer "1" -- "*" Billing Address
+    Billing Address "*" -- "1" Address
+    Order "1" -- "*" Order Payment
+    Order "1" -- "*" Order Item
+    Order "1" -- "1" Address : shipping address
+    Order Payment "*" -- "1" Billing Address
+    Order Item "*" -- "1" Product
+
+    Customer : name
+    Address : street
+    Address : city
+    Address : state
+    Address : postalCode
+    Order Payment : card number
+    Order Item : price
+    Product : name
+```
+
+##### 2-Aggregation Model
+
+```mermaid
+classDiagram
+    Customer "1" -- "*" Order
+    Customer "1" -- "[*]" Address : billing address
+    Order "1" -- "[*]" Payment : order payment
+    Order "1" -- "[*]" Order Item
+    Order "1" -- "[1]" Address : shipping address
+    Payment "1" -- "[1]" Address : billing address
+    Order Item "*" -- "1" Product
+
+    Customer : name
+    Address : street
+    Address : city
+    Address : state
+    Address : postalCode
+    Payment : card number
+    Order Item : price
+    Product : name
+```
+
+```json
+// in customers
+{
+    "id": 1,
+    "name": "Martin",
+    "billingAddress": [
+        {
+            "city": "Chicago"
+        }
+    ]
+}
+```
+
+```json
+// in orders
+{
+    "id": 99,
+    "customerId": 1,
+    "orderItems": [
+        {
+            "productId": 27,
+            "price": 32.45,
+            "productName": "NoSQL Distilled"
+        }
+    ],
+    "shippingAddress": {
+        "city": "Chicago"
+    },
+    "orderPayment": [
+        {
+            "ccinfo": "1000-1000-1000-1000",
+            "txnId": "abelif879rft",
+            "billingAddress": {
+                "city": "Chicago"
+            }
+        }
+    ]
+}
+```
+
+The two main aggregates are 'customer' and 'order'.
+- The 'customer' aggregate contains a list of billing addresses.
+- The 'order' aggregate contains a list of order items, a shipping address, and payments. Each payment also contains a billing address.
+
+An address record appears three times in the data, but it's treated as a value and copied each time to prevent changes to the shipping or billing address. This approach differs from a relational database where a new row would be created instead of updating existing address rows.
+
+The relationship between 'customer' and 'order' is not within either aggregate, but between them. Similarly, the link from an 'order item' would cross into a separate 'product' aggregate, which is not detailed in the example.
+
+The product name is shown as part of the 'order item', demonstrating denormalization, a common practice with aggregates to minimize the number of aggregates accessed during a data interaction.
+
+##### 1-Aggregation Model
+
+```mermaid
+classDiagram
+    Customer "1" -- "[*]" Order
+    Customer "1" -- "[*]" Address : billing address
+    Order "1" -- "[*]" Payment : order payment
+    Order "1" -- "[*]" Order Item
+    Order "1" -- "[1]" Address : shipping address
+    Payment "1" -- "[1]" Address : billing address
+    Order Item "*" -- "1" Product
+
+    Customer : name
+    Address : street
+    Address : city
+    Address : state
+    Address : postalCode
+    Payment : card number
+    Order Item : price
+    Product : name
+```
+
+```json
+// in customers
+{
+    "customer": {
+        "id": 1,
+        "name": "Martin",
+        "billingAddress": [
+            {
+                "city": "Chicago"
+            }
+        ],
+        "orders": [
+            {
+                "id": 99,
+                "customerId": 1,
+                "orderItems": [
+                    {
+                        "productId": 27,
+                        "price": 32.45,
+                        "productName": "NoSQL Distilled"
+                    }
+                ],
+                "shippingAddress": {
+                    "city": "Chicago"
+                },
+                "orderPayment": [
+                    {
+                        "ccinfo": "1000-1000-1000-1000",
+                        "txnId": "abelif879rft",
+                        "billingAddress": {
+                            "city": "Chicago"
+                        }
+                    }
+                ],
+            }
+        ]
+    }
+}
+```
+
+This emphasizes the importance of considering data access patterns when defining aggregate boundaries in your application data model. The way you group your data into aggregates can vary based on how you typically manipulate your data.
+
+For instance, if you often access a customer along with all their orders, it might be beneficial to put all orders into the customer aggregate. Conversely, if you usually work with one order at a time, it might be better to have separate aggregates for each order.
+
+The choice of how to draw your aggregate boundaries is context-specific and can vary even within a single system. This flexibility is one reason why some developers prefer to work with systems that don't enforce a specific aggregate structure (aggregate ignorance).
+
+#### 2.1.2. Consequences of Aggregate Orientation
+
+- **Aggregate Entities**: The relational model lacks the concept of aggregate entities, which are groups of related data items that are treated as a single unit for data manipulation and consistency purposes.
+
+- **Aggregate-Oriented Databases**: These databases provide clearer semantics for aggregates by focusing on the unit of interaction with the data storage. The definition of an aggregate is not a logical data property, but rather depends on how the data is used by applications.
+
+- **Aggregate-Ignorant Databases**: Relational and graph databases are considered aggregate-ignorant because they don't have a concept of aggregate within their data model. This can be beneficial when the same data is used in many different contexts, as it allows for more flexibility in viewing and manipulating data.
+
+- **Benefits of Aggregate Orientation**: Aggregate orientation can improve performance when running on a cluster by minimizing the number of nodes that need to be queried. It also provides important information to the database about which data items should be stored together.
+
+- **Transactions and Aggregates**: While relational databases support ACID transactions that can manipulate any combination of rows from any tables, aggregate-oriented databases typically only support atomic manipulation of a single aggregate at a time. This can limit the scope of atomicity, but it's often sufficient for most use cases.
+
+- **Consistency**: The topic of consistency in databases is more complex than whether a database supports ACID transactions or not. Other factors, such as how data is divided into aggregates, also play a role.
+
+### 2.2. Key-Value and Document Data Models
+
+- **Aggregate Orientation**: Key-value and document databases are strongly aggregate-oriented, meaning they are primarily constructed through aggregates. Each aggregate has a key or ID used to access the data.
+
+- **Key-Value vs Document Databases**: Key-value databases treat aggregates as opaque blobs, while document databases see a structure in the aggregate. Key-value databases offer more freedom in what can be stored, while document databases provide more flexibility in access.
+
+- **Accessing Aggregates**: In key-value stores, aggregates can only be accessed by their key. In contrast, document databases allow queries based on the fields in the aggregate, partial retrieval of the aggregate, and indexing based on the contents of the aggregate.
+
+- **Blurring Lines**: The distinction between key-value and document databases can blur in practice. For example, key-value databases may allow structures for data beyond just an opaque aggregate, and document databases may use an ID field for key-value style lookups.
+
+- **Expectations**: Generally, with key-value databases, we expect to look up aggregates using a key. With document databases, we mostly expect to submit queries based on the internal structure of the document.
+
+### 2.3. Column-Family Stores
+
+- **BigTable and Influences**: Google's BigTable, a NoSQL database, has influenced later databases like HBase and Cassandra. It's often referred to as a column store due to its data model.
+
+- **Column Stores**: Column stores, like C-Store, store data by groups of columns for all rows as the basic storage unit. This is beneficial when writes are rare, but there's a need to read a few columns of many rows at once.
+
+- **Column-Family Databases**: BigTable and its successors are referred to as column-family databases. They store groups of columns (column families) together but abandon the relational model and SQL.
+
+- **Column-Family Model**: This model is a two-level aggregate structure. The first key is often a row identifier, and the row aggregate is formed of a map of more detailed values, referred to as columns.
+
+- **Column Families**: Column-family databases organize their columns into column families. Each column is part of a single column family, and the column acts as a unit for access.
+
+- **Data Structure**: The data can be structured in two ways: row-oriented, where each row is an aggregate with column families representing chunks of data within that aggregate; or column-oriented, where each column family defines a record type with rows for each of the records.
+
+- **Cassandra's Approach**: Cassandra views things slightly differently. A row in Cassandra only occurs in one column family, but that column family may contain supercolumns—columns that contain nested columns.
+
+- **Wide and Skinny Rows**: Column-family databases can have wide rows with many columns (modeling a list) and skinny rows with few columns (defining a record type).
+
+- **Sort Order**: Column families can define a sort order for their columns, allowing access to orders by their order key and access ranges of orders by their keys.
+
+### 2.4. Summarizing Aggregate-OrientedDatabases
+
+- **Aggregate-Oriented Data Models**: These models are common in NoSQL databases and are characterized by the use of aggregates indexed by a key for lookup. They are crucial for running on a cluster, as they ensure all data for an aggregate is stored together on one node.
+  - **Atomic Unit for Updates**: The aggregate acts as the atomic unit for updates, providing a degree of transactional control.
+
+- **Key-Value Data Model**: This model treats the aggregate as an opaque whole, allowing only key lookup for the entire aggregate. It does not support running a query or retrieving a part of the aggregate.
+
+- **Document Model**: This model makes the aggregate transparent to the database, enabling queries and partial retrievals. However, due to the lack of a schema, the database cannot optimize the storage and retrieval of parts of the aggregate based on its structure.
+
+- **Column-Family Models**: These models divide the aggregate into column families, which the database can treat as units of data within the row aggregate. This imposes some structure on the aggregate, allowing the database to improve its accessibility.
+
+### 2.5. Further Reading
+
+- **Domain-Driven Design**: This book by Eric Evans is the definitive work on domain-driven design. It introduced the concept of aggregates and aggregate roots, which are the basis for the aggregate-oriented data model.
+
+### 2.6. Key Points
+
+- An aggregate is a collection of data that we interact with as a unit. Aggregates form the boundaries for ACID operations with the database.
+
+- Key-value, document, and column-family databases can all be seen as forms of aggregate-oriented database.
+
+- Aggregates make it easier for the database to manage data storage over clusters.
+
+- Aggregate-oriented databases work best when most data interaction is done with the same aggregate; aggregate-ignorant databases are better when interactions use data organized in many different formations.
