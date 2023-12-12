@@ -339,3 +339,367 @@ The choice of how to draw your aggregate boundaries is context-specific and can 
 - Aggregates make it easier for the database to manage data storage over clusters.
 
 - Aggregate-oriented databases work best when most data interaction is done with the same aggregate; aggregate-ignorant databases are better when interactions use data organized in many different formations.
+
+## Chapter 3. More Details on Data Models
+
+### 3.1. Relationships
+
+- **Aggregates and Data Access:** Aggregates group together commonly accessed data. However, the way data is accessed can vary, affecting how aggregates should be structured. For example, some applications may need to access a customer's entire order history, while others may need to process orders individually.
+
+- **Relationships Between Aggregates**: There can be relationships between different aggregates, such as a customer and their orders. These relationships can be represented by embedding the ID of one aggregate within another. However, this approach makes the database ignorant of the relationship.
+
+- **Database Awareness of Relationships**: Many databases, including key-value stores and document stores, provide ways to make these relationships visible to the database. This can be useful for forming indexes and queries, and for supporting partial retrieval and link-walking capabilities.
+
+- **Updates and Atomicity**: Aggregate-oriented databases treat the aggregate as the unit of data retrieval, and only support atomicity within a single aggregate. If multiple aggregates are updated at once, handling a failure partway through becomes the developer's responsibility.
+
+- **Operating Across Multiple Aggregates**: Working with multiple aggregates can be challenging with aggregate-oriented databases. While there are ways to manage this, the fundamental complexity remains.
+
+- **Relational Databases and Complex Relationships**: While relational databases can handle complex relationships, they also have their limitations. As the number of joins in a query increases, writing SQL and managing performance can become difficult.
+
+### 3.2. Graph Databases
+
+- **Graph Databases**: Unlike most NoSQL databases, graph databases are not primarily designed for cluster operation. They are designed to handle small records with complex interconnections, making them ideal for data with complex relationships like social networks, product preferences, or eligibility rules.
+
+- **Data Model**: The fundamental data model of a graph database is nodes connected by edges. There is a lot of variation in how data can be stored in nodes and edges, with some databases allowing additional attributes or storing Java objects.
+
+- **Query Operations**: Graph databases provide query operations designed for their graph structure. This allows for efficient traversal of relationships, shifting most of the work from query time to insert time. This is beneficial when query performance is more important than insert speed.
+
+- **Finding Data**: Data in a graph database is typically found by navigating through the network of edges. Some nodes can be indexed by an attribute for a starting point, but most query work is expected to be navigating relationships.
+
+- **Comparison with Aggregate-Oriented Databases**: Graph databases differ significantly from aggregate-oriented databases due to their emphasis on relationships. They are more likely to run on a single server and require ACID transactions to cover multiple nodes and edges for consistency. The main similarity is their rejection of the relational model.
+
+- **Example of a graph structure**:
+    - Nodes: Alice, Bob, Charlie, David
+    - Edges: Knows, Friend, Likes, Loves
+    - Relationships:
+        - Alice Knows Bob
+        - Bob is a Friend of Charlie
+        - Charlie Likes David
+        - David Loves Alice
+    - Possible queries:
+        - Find all of Alice's friends
+        - Find all of Alice's friends who like David
+        - Find all of Alice's friends who like David and are loved by David
+
+```mermaid
+graph TB
+    A[Person: Alice]
+    B[Person: Bob]
+    C[Person: Charlie]
+    D[Person: David]
+    
+    A -- Knows --> B
+    B -- Friend --> C
+    C -- Likes --> D
+    D -- Loves --> A
+```
+
+### 3.3. Schemaless Databases
+
+- **Schemaless Databases**: NoSQL databases are often schemaless, meaning they do not require a predefined structure for the data they store. This contrasts with relational databases, which require a defined schema before data can be stored.
+
+- **Flexibility of Schemaless Databases**: Schemaless databases allow for more flexibility in data storage. They can store any data under any key, document, column, or node. This flexibility is beneficial when the data to be stored is not fully known in advance or when the data structure may change over time.
+
+- **Handling Nonuniform Data**: Schemaless databases handle nonuniform data more efficiently than relational databases. They allow each record to contain just what it needs, avoiding the need for null values or meaningless columns.
+
+- **Implicit Schema in Programs**: Despite the schemaless nature of NoSQL databases, programs that access the data often rely on an implicit schema. They assume certain field names and data types, which can lead to problems if the assumptions do not match the actual data.
+
+- **Problems with Implicit Schema**: Having an implicit schema in the application code can make it difficult to understand the data structure without examining the code. It also prevents the database from using the schema to optimize data storage and retrieval, and from validating the data.
+
+- **Shifting the Schema to Application Code**: In a schemaless database, the schema is essentially shifted into the application code. This can cause problems if multiple applications access the same database, but these problems can be mitigated with certain approaches, such as encapsulating all database interaction within a single application.
+
+- **Changing Relational Schemas**: Contrary to common criticism, relational schemas can be changed at any time with standard SQL commands. However, schemaless databases may still be preferred for nonuniform data.
+
+- **Impact of Schemalessness on Database Structure Changes**: Schemalessness affects how a database's structure can be changed over time. Changes must be controlled to ensure old and new data can be accessed easily. The flexibility of schemalessness applies only within an aggregate; changing aggregate boundaries is as complex as in the relational case.
+
+### 3.4. Materialized Views
+
+- **Aggregate-Oriented Data Models**: These models have advantages in storing and accessing data as a unit, but can be disadvantageous when needing to access individual elements within the aggregate.
+
+- **Relational Databases and Views**: Relational databases can support different data access methods due to their lack of aggregate structure. They use views, which are computations over base tables, to present data differently from how it's stored.
+
+- **Materialized Views**: These are views that are computed in advance and cached on disk. They are useful for data that is read frequently but can tolerate being slightly outdated. 
+
+- **Materialized Views in NoSQL Databases**: NoSQL databases may not have views, but they can have precomputed and cached queries, often referred to as materialized views. These are particularly important for aggregate-oriented databases when dealing with queries that don't align well with the aggregate structure.
+
+- **Strategies for Building Materialized Views**: There are two main strategies - the eager approach, where the materialized view is updated simultaneously with the base data, and the batch approach, where materialized views are updated at regular intervals.
+
+- **Building Materialized Views Outside the Database**: Materialized views can be built outside the database by reading the data, computing the view, and saving it back to the database. Alternatively, some databases support building materialized views internally.
+
+- **Materialized Views within the Same Aggregate**: Materialized views can be used within the same aggregate to provide summary information, reducing the need to transfer the entire document for a query. This is a common feature in column-family databases and allows for atomic operations on the materialized view.
+
+### 3.5. Modeling for Data Access
+
+1. **Embedding All Data for a Customer**: The text begins by discussing a model where all data related to a customer, including details, billing addresses, payments, and orders, is embedded within a single object in a key-value store. This allows for easy retrieval of all customer-related data, but requires parsing on the client side to access specific information.
+
+```json
+// Customer Object
+{
+    "id": "Customer ID",
+    "details": {
+        "name": "Martin"
+    },
+    "billingAddresses": [
+        {
+            "city": "Chicago"
+        }
+    ],
+    "payments": [
+        {
+            "type": "debit",
+            "ccinfo": "1000-1000-1000-1000"
+        }
+    ],
+    "orders": [
+        {
+            "orderDate": "Nov-20-2011",
+            "shippingAddress": {
+                "city": "Chicago"
+            },
+            "payments": [
+                {
+                    "ccinfo": "1000-1000-1000-1000",
+                    "txnId": "abelif879rft"
+                }
+            ],
+            "items": [
+                {
+                    "productId": 27,
+                    "price": 32.45
+                }
+            ]
+        }
+    ]
+}
+```
+
+```mermaid
+---
+title: Embed all the objects for customer and their orders.
+---
+flowchart TB
+    subgraph "Customer (key = id | value = Object)"
+        subgraph "Details (value = Object)"
+        end
+        subgraph "Billing Addresses (value = List[Object])"
+        end
+        subgraph "Payments (value = List[Object])"
+        end
+        subgraph "Orders (value = List)"
+            subgraph "Order (value = Object)"
+                subgraph "Shipping Address (value = Object)"
+                end
+                subgraph "Payments (value = List[Object])"
+                end
+                subgraph "Items (value = List)"
+                    subgraph "Product (key = productId | value = Object)"
+                    end
+                end
+            end
+        end
+    end
+```
+
+2. **Separating Customer and Order Data**: The text then discusses a model where customer and order data are stored separately, with references (like order IDs) used to link related data. This allows for more efficient querying but requires maintaining references between objects.
+
+```json
+// Customer Object
+{
+    "id": "Customer ID",
+    "details": {
+        "name": "Martin"
+    },
+    "billingAddresses": [
+        {
+            "city": "Chicago"
+        }
+    ],
+    "payments": [
+        {
+            "type": "debit",
+            "ccinfo": "1000-1000-1000-1000"
+        }
+    ],
+    "orders": [
+        {
+            "orderId": 99
+        }
+    ]
+}
+```
+
+```json
+// Order Object
+{
+    "id": "Order Id",
+    "customerId": "Customer ID",
+    "orderDate": "Nov-20-2011",
+    "shippingAddress": {
+        "city": "Chicago"
+    },
+    "payments": [
+        {
+            "ccinfo": "1000-1000-1000-1000",
+            "txnId": "abelif879rft"
+        }
+    ],
+    "items": [
+        {
+            "productId": 27,
+            "price": 32.45
+        }
+    ]
+}
+```
+
+```mermaid
+---
+title: Customer is stored separately from Order.
+---
+flowchart TB
+    subgraph "Customer (key = id | value = Object)"
+        subgraph "Details (value = Object)"
+        end
+        subgraph "Billing Addresses (value = List[Object])"
+        end
+        subgraph "Payments (value = List[Object])"
+        end
+        subgraph "Orders (value = List)"
+            subgraph "Order (key = orderId | value = Object)"
+            end
+        end
+    end
+
+    subgraph "Order (key = id | value = Object)"
+        subgraph "Shipping Address (value = Object)"
+        end
+        subgraph "Payments (value = List[Object])"
+        end
+        subgraph "Items (value = List)"
+            subgraph "Product (key = productId | value = Object)"
+            end
+        end
+    end
+```
+
+3. **Using Aggregates for Analytics**: The text discusses how aggregates can be used to facilitate analytics, such as identifying which orders contain a particular product. This involves denormalizing the data to allow for faster access to relevant information.
+
+```json
+[
+    {
+        "productId": 27,
+        "orders": {
+            99,545,897,678
+        }
+    },
+    {
+        "productId": 29,
+        "orders": {
+            199,545,704,819
+        }
+    }
+]
+```
+
+4. **Removing Order References from the Customer Object**: The text discusses a model where references to orders are removed from the customer object, allowing for updates to orders without needing to update the customer object. This is possible in document stores, which allow querying within documents.
+
+```json
+// Customer Object
+{
+    "id": "Customer ID",
+    "details": {
+        "name": "Martin"
+    },
+    "billingAddresses": [
+        {
+            "city": "Chicago"
+        }
+    ],
+    "payments": [
+        {
+            "type": "debit",
+            "ccinfo": "1000-1000-1000-1000"
+        }
+    ]
+}
+```
+
+```json
+// Order Object
+{
+    "id": "Order Id",
+    "customerId": "Customer ID",
+    "orderDate": "Nov-20-2011",
+    "shippingAddress": {
+        "city": "Chicago"
+    },
+    "payments": [
+        {
+            "ccinfo": "1000-1000-1000-1000",
+            "txnId": "abelif879rft"
+        }
+    ],
+    "items": [
+        {
+            "productId": 27,
+            "price": 32.45
+        }
+    ]
+}
+```
+
+5. **Modeling for Column-Family Stores**: The text discusses how to model data for column-family stores, emphasizing the importance of designing the model based on query requirements rather than write requirements. The text suggests denormalizing data during write operations to make querying easier.
+
+```mermaid
+---
+title: Conceptual view into a column data store
+---
+flowchart TB
+    subgraph "Customer (key = id | value = Object)"
+        subgraph "Details (value = Object)"
+        end
+        subgraph "Orders (value = List[Object])"
+        end
+    end
+    subgraph "Order (key = id | value = Object)"
+        subgraph "Shipping Address (value = Object)"
+        end
+        subgraph "Payments (value = List[Object])"
+        end
+        subgraph "Items (value = List)"
+            subgraph "Product (key = productId | value = Object)"
+            end
+        end
+    end
+```
+
+6. **Using Graph Databases**: Finally, the text discusses how to model data using graph databases, where objects are modeled as nodes and relationships between them are modeled as edges. This allows for easy traversal of relationships, which can be useful for tasks like product recommendation or pattern detection.
+
+```mermaid
+---
+title: Graph model of e-commerce data
+---
+graph TB
+    A[Customer]
+    B[Address]
+    C[Product]
+    D[OrderPayment]
+    E[Order]
+    
+    A -- BILLED_TO --> B
+    A -- BELONGS_TO --> D
+    C -- PURCHASED --> A
+    C -- PART_OF --> E
+    E -- SHIPPED_TO --> B
+    E -- PAID_WITH --> D
+```
+
+### 3.6. Key Points
+
+- Aggregate-oriented databases make inter-aggregate relationships more difficult to handle than intra-aggregate relationships.
+
+- Graph databases organize data into node and edge graphs; they work best for data that has complex relationship structures.
+
+- Schemaless databases allow you to freely add fields to records, but there is usually an implicit schema expected by users of the data.
+
+- Aggregate-oriented databases often compute materialized views to provide data organized differently from their primary aggregates. This is often done with map-reduce computations.
