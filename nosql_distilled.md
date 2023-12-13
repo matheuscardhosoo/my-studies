@@ -703,3 +703,266 @@ graph TB
 - Schemaless databases allow you to freely add fields to records, but there is usually an implicit schema expected by users of the data.
 
 - Aggregate-oriented databases often compute materialized views to provide data organized differently from their primary aggregates. This is often done with map-reduce computations.
+
+## Chapter 4. Distribution Models
+
+- **NoSQL and Scalability**: The initial focus is on the key advantage of NoSQL databases: their ability to scale out across a large cluster of servers, which is particularly beneficial as data volumes increase.
+
+- **Benefits and Costs of Scaling Out**: Scaling out can provide the ability to handle larger quantities of data, process greater read or write traffic, and maintain availability in the face of network issues. However, it also introduces complexity, making it a strategy to consider only when the benefits outweigh the costs.
+
+- **Data Distribution Strategies**: The text introduces two main strategies for data distribution: replication and sharding. Replication involves copying the same data across multiple nodes, while sharding involves distributing different data across different nodes.
+
+- **Replication Techniques**: The text further breaks down replication into two forms: master-slave and peer-to-peer. It outlines a plan to discuss these techniques in increasing order of complexity: single-server, master-slave replication, sharding, and finally peer-to-peer replication.
+
+### 4.1. Single Server
+
+- **Single-Server Distribution**: The simplest form of data distribution, recommended for its ease of management and simplicity for application developers.
+
+- **NoSQL on Single-Server**: Despite many NoSQL databases being designed for cluster operation, using them in a single-server model can be beneficial if the data model suits the application, such as with graph databases or aggregate processing.
+
+- **Complex Distribution Schemes**: While the rest of the chapter will discuss more complex distribution schemes, the single-server approach is preferred when possible, despite the greater volume of discussion dedicated to the more complex options.
+
+### 4.2. Sharding
+
+```mermaid
+---
+title: Sharding puts different data on separate nodes, each of which does its own reads and writes.
+---
+graph TB
+    subgraph "Database Cluster"
+        subgraph shard_1 ["Shard 1"]
+            S1D1((♦️))
+        end
+        subgraph shard_2 ["Shard 2"]
+            S2D1((♣️))
+            S2D2((♥️))
+        end
+        subgraph shard_3 ["Shard 3"]
+            S3D1((♠️))
+        end
+    end
+
+    A1{"Application R/W\n♦️"} <-- R/W --> shard_1
+    A2{"Application R/W\n♣️"} <-- R/W --> shard_2
+    A3{"Application R/W\n♥️"} <-- R/W --> shard_2
+    A4{"Application R/W\n♠️"} <-- R/W --> shard_3
+```
+
+- **Sharding**: A technique used to distribute different parts of a dataset across different servers for improved horizontal scalability.
+
+- **Ideal Case of Sharding**: The ideal scenario is when different users interact with different server nodes, each user only communicates with one server, leading to faster responses and balanced load across servers.
+
+- **Data Clumping and Aggregate Orientation**: The text talks about the importance of grouping data that is accessed together on the same node (data clumping) and how aggregate orientation can help achieve this.
+
+- **Data Arrangement on Nodes**: Several factors can improve performance when arranging data on nodes, such as placing data close to where it's accessed and evenly distributing aggregates across nodes.
+
+- **Sharding in Application Logic**: Historically, sharding has been done as part of application logic, which can complicate the programming model. However, many NoSQL databases now offer auto-sharding, which simplifies this process.
+
+- **Performance and Resilience**: Sharding can improve both read and write performance, but it doesn't necessarily improve resilience. While it can limit the impact of a node failure to only the users of the data on that shard, it can also decrease resilience if used alone.
+
+- **Sharding Implementation**: The text warns that implementing sharding is not a step to be taken lightly. It advises starting with a single-server configuration and only moving to sharding when load projections indicate it's necessary. It also emphasizes the importance of implementing sharding well before it's needed to avoid potential issues.
+
+### 4.3. Primary-Secondary Replication
+
+```mermaid
+---
+title: Data is replicated from Primary to Secondary. The Primary services all writes; reads may come from either Primary or Secondary.
+---
+graph TB
+    subgraph "Database Cluster"
+        subgraph node_1 ["Primary Node"]
+            S1D1((♦️))
+            S1D2((♣️))
+            S1D3((♥️))
+            S1D4((♠️))
+        end
+        subgraph node_2 ["Secondary Node"]
+            S2D1((♦️))
+            S2D2((♣️))
+            S2D3((♥️))
+            S2D4((♠️))
+        end
+        subgraph node_3 ["Secondary Node"]
+            S3D1((♦️))
+            S3D2((♣️))
+            S3D3((♥️))
+            S3D4((♠️))
+        end
+    end
+
+
+    A1{"Application R/W\n♦️ ♣️ ♥️ ♠️"} <-- R/W --> node_1
+    node_1 --> node_2
+    node_1 --> node_3
+    node_2 -- R --> A2{"Application R\n♦️ ♣️ ♥️ ♠️"}
+    node_3 -- R --> A3{"Application R\n♦️ ♣️ ♥️ ♠️"}
+```
+
+- **Primary-Secondary Replication**: Data is replicated across multiple nodes. The primary node is the authoritative source for the data and handles updates, while secondary nodes are synchronized with the primary.
+
+- **Scaling and Read-Intensive Datasets**: Primary-secondary replication is beneficial for scaling read-intensive datasets. By adding more secondary nodes and routing read requests to them, the system can handle more read requests. However, the system's ability to process updates and propagate them is still limited by the primary node's capacity.
+
+- **Read Resilience and Failure Handling**: Another advantage of primary-secondary replication is read resilience. If the primary node fails, secondary nodes can still handle read requests. The system can quickly appoint a new primary from the secondary nodes, speeding up recovery after a failure.
+
+- **Hot Backup and Resilience**: All read and write traffic can go to the primary while the secondary acts as a hot backup. This setup provides the convenience of a single-server configuration with greater resilience, especially useful for handling server failures gracefully.
+
+- **Primary Node Appointment**: Primary nodes can be appointed manually or automatically. Automatic appointment allows the cluster to automatically appoint a new primary when the current one fails, reducing downtime.
+
+- **Read and Write Paths**: To achieve read resilience, the application should have separate read and write paths. This setup allows the system to handle a failure in the write path while still being able to read.
+
+- **Replication and Inconsistency**: Replication offers many benefits, but it also introduces the risk of inconsistency. Different clients reading from different secondary nodes might see different values if changes haven't propagated to all secondary nodes yet. This issue is discussed further in the section on "Consistency".
+
+### 4.4. Peer-to-Peer Replication
+
+```mermaid
+---
+title: Peer-to-peer replication has all nodes applying reads and writes to all the data.
+---
+graph TB
+    subgraph "Database Cluster"
+        subgraph node_1 ["Node 1"]
+            S1D1((♦️))
+            S1D2((♣️))
+            S1D3((♥️))
+            S1D4((♠️))
+        end
+        subgraph node_2 ["Node 2"]
+            S2D1((♦️))
+            S2D2((♣️))
+            S2D3((♥️))
+            S2D4((♠️))
+        end
+        subgraph node_3 ["Node 3"]
+            S3D1((♦️))
+            S3D2((♣️))
+            S3D3((♥️))
+            S3D4((♠️))
+        end
+    end
+
+
+    A1{"Application R/W\n♦️ ♣️ ♥️ ♠️"} <-- R/W --> node_1
+    A2{"Application R/W\n♦️ ♣️ ♥️ ♠️"} <-- R/W --> node_2
+    A3{"Application R/W\n♦️ ♣️ ♥️ ♠️"} <-- R/W --> node_3
+    node_1 <--> node_2
+    node_1 <--> node_3
+    node_2 <--> node_3
+```
+
+- **Primary-Secondary Replication Limitations**: The primary node is a potential bottleneck and a single point of failure.
+
+- **Peer-to-Peer Replication**: All nodes are equal, can accept writes, and the loss of any node doesn't prevent data access.
+
+- **Benefits and Complications**: Peer-to-peer replication offers benefits like resilience to node failures and improved performance with added nodes. However, it also introduces complications, primarily related to data consistency.
+
+- **Write-Write Conflict**: The risk of write-write conflict arises when two different places can be written to simultaneously, leading to potential inconsistencies.
+
+- **Handling Write Inconsistencies**: There are two broad options for handling write inconsistencies. One is to coordinate replicas during a write to avoid conflict, and the other is to cope with an inconsistent write and merge them based on a policy.
+
+- **Consistency vs Availability Trade-off**: These points are at the ends of a spectrum where we trade off consistency for availability.
+
+### 4.5. Combining Sharding and Replication
+
+#### 4.5.1. Primary-Secondary Replication X Sharding
+
+- **Multiple Primary Nodes with Unique Data Items**: The system has multiple primary nodes, but each data item is primarily controlled by a single node.
+
+- **Node Configuration**: Nodes can be configured to serve as a primary for some data and secondary for others, or nodes can be dedicated solely to primary or secondary roles.
+
+```mermaid
+---
+title: Using primary-secondary replication together with sharding
+---
+graph TB
+    subgraph "Database Cluster"
+        subgraph node_1 ["[ Primary - Shards: ♦️ ♣️ ]"]
+            S1D1((♦️))
+            S1D2((♣️))
+        end
+        subgraph node_2 ["[ Secondary - Shards: ♣️ ♠️ ]"]
+            S2D1[♣️]
+            S2D2[♠️]
+        end
+        subgraph node_3 ["[ Primary - Shards: ♠️ ]"]
+            S3D1((♠️))
+        end
+        subgraph node_4 ["[ Primary - Shards: ♥️ ]\n[ Secondary - Shards: ♦️ ]"]
+            S4D1((♥️))
+            S4D2[♦️]
+        end
+        subgraph node_5 ["[ Secondary - Shards: ♣️ ♥️ ]"]
+            S5D1[♣️]
+            S5D2[♥️]
+        end
+        subgraph node_6 ["[ Secondary - Shards:  ♠️ ]"]
+            S6D1[♠️]
+        end
+
+        node_1 -- ♣️ --> node_2
+        node_1 -- ♦️ --> node_4
+        node_1 -- ♣️ --> node_5
+        node_3 -- ♠️ --> node_2
+        node_3 -- ♠️ --> node_6
+        node_4 -- ♥️ --> node_5
+    end
+```
+
+#### 4.5.2. Peer-to-Peer Replication X Sharding
+
+- **Cluster Configuration**: Considering a column-family databases setup, there could be tens or hundreds of nodes in a cluster with data sharded across them. 
+
+- **Replication Factor**: A replication factor of 3 is suggested as a good starting point, meaning each shard is present on three nodes. 
+
+- **Node Failure Handling**: If a node fails, the shards on that node will be rebuilt on the other nodes.
+
+```mermaid
+---
+title: Using peer-to-peer replication together with sharding
+---
+graph TB
+    subgraph "Database Cluster"
+        subgraph node_1 ["[ Shards: ♦️ ♣️ ]"]
+            S1D1((♦️))
+            S1D2((♣️))
+        end
+        subgraph node_2 ["[ Shards: ♣️ ♠️ ]"]
+            S2D1((♣️))
+            S2D2((♠️))
+        end
+        subgraph node_3 ["[ Shards: ♠️ ]"]
+            S3D1((♠️))
+        end
+        subgraph node_4 ["[ Shards: ♥️ ♦️ ]"]
+            S4D1((♥️))
+            S4D2((♦️))
+        end
+        subgraph node_5 ["[ Shards: ♣️ ♥️ ]"]
+            S5D1((♣️))
+            S5D2((♥️))
+        end
+        subgraph node_6 ["[ Shards:  ♠️ ]"]
+            S6D1((♠️))
+        end
+
+        node_1 <-- ♣️ --> node_2
+        node_1 <-- ♦️ --> node_4
+        node_1 <-- ♣️ --> node_5
+        node_2 <-- ♣️ --> node_5
+        node_2 <-- ♠️ --> node_3
+        node_2 <-- ♠️ --> node_6
+        node_3 <-- ♠️ --> node_6
+        node_4 <-- ♥️ --> node_5
+    end
+```
+
+### 4.6. Key Points
+
+- There are two styles of distributing data (a system may use either or both techniques):
+  - Sharding distributes different data across multiple servers, so each server acts as the single source for a subset of data.
+  - Replication copies data across multiple servers, so each bit of data can be found in multiple places.
+
+- Replication comes in two forms:
+  - Primary-secondary replication makes one node the authoritative copy that handles writes while secondaries synchronize with the primary and may handle reads.
+  - Peer-to-peer replication allows writes to any node; the nodes coordinate to synchronize their copies of the data.
+
+- Primary-secondary replication reduces the chance of update conflicts but peer-to-peer replication avoids loading all writes onto a single point of failure.
