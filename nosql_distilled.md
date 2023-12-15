@@ -966,3 +966,199 @@ graph TB
   - Peer-to-peer replication allows writes to any node; the nodes coordinate to synchronize their copies of the data.
 
 - Primary-secondary replication reduces the chance of update conflicts but peer-to-peer replication avoids loading all writes onto a single point of failure.
+
+## Chapter 5. Consistency
+
+- **Transition to NoSQL Databases**: The text discusses the shift from centralized relational databases to cluster-oriented NoSQL databases, emphasizing the change in how consistency is considered. It mentions that relational databases aim to exhibit strong consistency by avoiding various inconsistencies, while NoSQL databases aim to exhibit eventual consistency by allowing inconsistencies to occur and then resolving them.
+
+### 5.1. Update Consistency
+
+- **Write-Write Conflict**: Two users attempt to update the same data item simultaneously.
+    - **Example**: Two users attempt to update the same customer's address at the same time. The server receives both updates and applies them in an arbitrary order, resulting in one update being lost. This called a **lost update**.
+
+- **Consistency Maintenance Approaches**: There are two main approaches to maintaining consistency: pessimistic and optimistic.
+    - **Pessimistic**: The pessimistic approach prevents conflicts from occurring.
+        - **Strategies**:
+            - **Write Lock**: The server applies a write lock to the data item, preventing other users from updating it until the first update is complete.
+        - **Issues**:
+            - **Degraded Responsiveness**: The server must wait for the first update to complete before allowing the second update to proceed, which can lead to degraded responsiveness.
+            - **Deadlocks**: If two users attempt to update the same data item simultaneously, each will acquire a write lock and wait for the other to release it, resulting in a deadlock.
+    - **Optimistic**: The optimistic approach allows conflicts to occur but detects and resolves them.
+        - **Strategies**:
+            - **Conditional Update**: The server applies the update if the data item has not been updated since the user read it. If the data item has been updated, the server rejects the update and the user must read the data again and try the update again.
+            - **Handling Write-Write Conflicts**: The server applies both updates and records that they are in conflict. The user must read the data again and resolve the conflict (usually used in version control systems).
+        - **Issues**:
+            - **Read-Modify-Write**: The user must read the data, modify it, and write it back. If the data is updated between the read and write, the user must read the data again and try the update again.
+            - **Extra Work**: Conditional updates and conflict resolution require extra work from the user, which can be difficult to implement correctly.
+
+- **Consistent Serialization**: Updates are applied in the same order on all nodes.
+
+- **Sequential Consistency**: All nodes see the same order of updates.
+
+- **Safety vs Liveness**: Each approach has its own tradeoff between safety and liveness.
+    - **Safety**: Avoiding errors such as update conflicts.
+    - **Liveness**: Responding quickly to clients.
+
+- **Replication and Update Consistency**: Replication introduces the risk of update conflicts, noting that using a single node for all writes makes it easier to maintain update consistency.
+
+### 5.2.Read Consistency
+
+- **Logical Consistency and Read-Write Conflicts**: The text discusses the concept of logical consistency, where different data items need to make sense together. It explains the scenario of a read-write conflict, where a read operation occurs in the middle of a write operation, leading to inconsistent data.
+
+```mermaid
+sequenceDiagram
+    actor Martin
+    box Database
+        participant Line Items
+        participant Shipping Charges
+    end
+    actor Pramod
+
+    Martin ->>+ Line Items: Update
+    Line Items -->>- Martin: Update Complete
+    Pramod ->>+ Line Items: Read
+    Line Items -->>- Pramod: Updated Line Items
+    Pramod ->>+ Shipping Charges: Read
+    Shipping Charges -->>- Pramod: Inconsistent Data
+    Martin ->>+ Shipping Charges: Update
+    Shipping Charges -->>- Martin: Update Complete
+```
+
+- **Transactions and Consistency**: By wrapping multiple writes in a transaction, the system can ensure that all data items are read either before or after the update, avoiding inconsistencies.
+
+- **NoSQL Databases and Consistency**: The text refutes the claim that NoSQL databases can't support transactions and thus can't be consistent. It clarifies that some NoSQL databases, particularly aggregate-oriented ones, do support atomic updates within a single aggregate, ensuring logical consistency within the aggregate.
+
+- **Inconsistency Window**: The time during which an inconsistent read could occur. The inconsistency window for some NoSQL systems can be quite short.
+
+- **Replication Consistency**: Ensures that the same data item has the same value when read from different replicas.
+    - **Eventual Consistency**: Nodes may have replication inconsistencies at any time, but if there are no further updates, all nodes will eventually be updated to the same value.
+
+```mermaid
+sequenceDiagram
+    box Mumbai
+        actor Pramod
+        participant DB Replica (Mumbai)
+    end
+    box Boston
+        participant DB Replica (Boston)
+        actor Cindy
+    end
+    box London
+        participant DB Replica (London)
+        actor Martin
+    end
+
+    Pramod ->> DB Replica (Mumbai): Books last hotel room
+    DB Replica (Mumbai) ->>+ DB Replica (Boston): Propagate update
+    DB Replica (Mumbai) ->>+ DB Replica (London): Propagate update
+    DB Replica (Boston) -->>- DB Replica (Mumbai): Replication complete
+    Cindy ->>+ DB Replica (Boston): Read
+    DB Replica (Boston) -->>- Cindy: Booked room
+    Martin ->>+ DB Replica (London): Read
+    DB Replica (London) -->>- Martin: Available room
+    DB Replica (London) -->>- DB Replica (Mumbai): Replication complete
+```
+
+- **Consistency Guarantees and Levels**: Consistency guarantees can be specified at the level of individual requests, allowing for weak consistency most of the time and strong consistency when necessary.
+
+- **Read-Your-Writes Consistency and Session Consistency**: The text discusses the need for read-your-writes consistency, where once an update is made, the user is guaranteed to continue seeing that update.
+    - **Session Consistency**: Techniques for maintaining read-your-writes consistency within a user's session. This can be done by routing all requests from a user to the same node (**sticky sessions**), or by using version stamps to ensure that the user sees the latest version of the data (**etag**).
+
+- **Replication Consistency in Application Design**: The text concludes by discussing the importance of replication consistency in overall application design, and the challenges of maintaining consistency during user interaction.
+
+### 5.3. Relaxing Consistency
+
+- **Consistency Trade-offs**: Discusses the necessity of sometimes sacrificing consistency in system design due to other constraints. Different domains have varying tolerances for inconsistency, which should be considered in system design decisions. The trade-off between consistency and other system characteristics is seen as an inevitable part of system design.
+
+- **Relational Database Systems and Consistency**: Explains how transactions in single-server relational database systems enforce consistency. However, transaction systems usually come with the ability to relax isolation levels, allowing queries to read data that hasn’t been committed yet. Most applications choose to operate at the read-committed transaction level, which eliminates some read-write conflicts but allows others.
+
+- **Performance Impact of Transactions**: Highlights scenarios where systems avoid transactions due to their high performance impact. Examples include the early popularity of MySQL, which didn't support transactions, and large websites like eBay that needed to forego transactions for performance reasons.
+
+- **Transactions and Sharding**: Mentions that the need for sharding can also lead to the avoidance of transactions.
+
+- **Non-Transactional Updates**: Concludes by noting that many applications need to interact with remote systems that can't be included within a transaction boundary, making non-transactional updates a common occurrence in enterprise applications.
+
+####  5.3.1. The CAP Theorem
+
+- **CAP Theorem**: States that a distributed data store cannot simultaneously provide more than two out of the following three guarantees: **Consistency**, **Availability**, and **Partition tolerance**. The theorem is often used to explain why some NoSQL databases may relax consistency.
+    - **Consistency**: All nodes see the same data at the same time.
+    - **Availability (particular meaning in the context of CAP)**: If you can talk to a node in the cluster, it can read and write data.
+    - **Partition tolerance**: The cluster can survive communication breakages in the cluster that separate the cluster into multiple partitions unable to communicate with each other (situation known as a **split brain**).
+
+- **Single-Server Systems and CA**: Single-server systems are examples of systems that provide Consistency and Availability but not Partition tolerance. Most relational database systems operate in this world.
+
+- **Trade-off between Consistency and Availability**: In a system that may suffer partitions, there is a trade-off between consistency and availability. This isn't a binary decision; often, a little consistency can be traded off to gain some availability.
+
+- **Examples**:
+    - **Booking System**: Two users are trying to book the last hotel room. The system must decide between ensuring consistency (and potentially sacrificing availability) or improving availability (and potentially allowing inconsistent data).
+    - **Inconsistent Writes and Shopping Cart (Amazon Dynamo)**: Discusses the concept of allowing inconsistent writes, using the example of a shopping cart. Even if network failures result in multiple shopping carts, the checkout process can merge the carts, allowing the user to review before completing the order.
+
+- **Read Consistency and Tolerance of Stale Reads**: Different data items may have different tolerances for staleness, and this tolerance needs to be considered when configuring replication.
+
+- **ACID and BASE Properties**: Mentions the ACID (Atomicity, Consistency, Isolation, Durability) properties of relational transactions and the BASE (Basically Available, Soft state, Eventual consistency) properties often associated with NoSQL systems. The tradeoff between ACID and BASE is seen as a spectrum, not a binary choice.
+
+- **Consistency vs Latency**: It’s usually better to think not about the tradeoff between *consistency* and *availability* but rather between *consistency* and *latency*. We could add more nodes to a system to improve availability, but that would increase the latency of the system. So, we can think about availability as the limit of latency that we’re prepared to tolerate; once latency gets too high, we give up and treat the data as unavailable.
+    - **Latency and CAP**: The CAP theorem is often misinterpreted as a trade-off between consistency and availability, but it’s actually a trade-off between consistency and latency.
+
+### 5.4. Relaxing Durability
+
+- **Durability Trade-offs**: Discusses the concept of trading off some durability for higher performance. This can be achieved by running a database mostly in memory, applying updates to its in-memory representation, and periodically flushing changes to disk. The risk is that any updates since the last flush will be lost if the server crashes.
+
+- **Examples**:
+    - **User-Session State**: A large website may have many users and keep temporary information about each user's activity in a session state. Losing the session data isn't too much of a tragedy and may be less annoying than a slower website, making it a good candidate for nondurable writes.
+    - **Telemetric Data**: Capturing telemetric data from physical devices at a faster rate may be more important than the risk of missing the last updates if the server crashes.
+
+- **Replicated Data and Durability Trade-offs**: A failure of replication durability occurs when a primary node processes an update but fails before that update is replicated to the secondary nodes. If a primary does fail, any writes not passed onto the replicas will effectively become lost.
+
+- **Primary-Secondary Distribution Model**: In a primary-secondary distribution model, if the primary fails, the secondary nodes may appoint a new primary automatically. If the primary comes back online, those updates will conflict with updates that have happened since.
+
+- **Improving Replication Durability**: Replication durability can be improved by ensuring that the primary waits for some replicas to acknowledge the update before the primary acknowledges it to the client. However, this will slow down updates and make the cluster unavailable if secondary nodes fail, leading to another tradeoff depending on how vital durability is.
+
+### 5.5. Quorums
+
+- **Consistency and Durability Trade-offs**: Discusses the concept of trading off consistency or durability for performance. The more nodes involved in a request, the higher the chance of avoiding inconsistency. However, the number of nodes required for strong consistency depends on the system's configuration.
+
+- **Write Quorum**: The minimum number of nodes that must acknowledge a write to ensure strong consistency. For example, in a system with three nodes, only two need to acknowledge a write for strong consistency. This is because if there are conflicting writes, only one can get a majority.
+    - **Inequality**: `W > N / 2`
+        - `W`: Write Quorum
+        - `N`: Number of Nodes
+
+- **Read Quorum**: The minimum number of nodes that must be contacted to ensure the most up-to-date data is read. The read quorum depends on the write quorum. For instance, if all writes need two nodes to confirm, then at least two nodes need to be contacted for a read. However, if writes are only confirmed by a single node, all three nodes need to be contacted for a read.
+    - **Inequality**: `R + W > N`
+        - `R`: Read Quorum
+        - `W`: Write Quorum
+        - `N`: Number of Nodes
+
+- **Strongly Consistent Reads**: Even if there isn't strong consistency on writes, strongly consistent reads can still be achieved by contacting enough readers to detect any update conflicts.
+
+- **Replication Factor**: The number of replicas of the data. The replication factor is often different from the number of nodes in the cluster. For example, a cluster may have 100 nodes but only a replication factor of 3. A replication factor of 3 is often suggested for good resilience, allowing a single node to fail while still maintaining quorums for reads and writes.
+
+- **Operation-Specific Quorums**: The number of nodes participating in an operation can vary with the operation. Some types of updates might require a quorum, while others might not, depending on the value placed on consistency and availability. Similarly, a read that needs speed but can tolerate staleness should contact fewer nodes.
+
+- **Balancing Consistency, Availability, and Performance**: There is a range of options to work with when balancing consistency, availability, and performance. The choice depends on the specific circumstances and the trade-offs that are acceptable.
+
+### 5.6. Further Reading
+
+- *Tanenbaum and Van Steen*, **Distributed Systems: Principles and Paradigms (2nd Edition)**, is a good introduction to distributed systems, including consistency and replication.
+    - Link: https://www.amazon.com/Distributed-Systems-Principles-Paradigms-2nd/dp/0132392275
+
+- IEEE Computer Feb 2012, **There is More Consensus in Egalitarian Parliaments**, discusses the CAP theorem and the tradeoffs between consistency and availability.
+    - Link: https://ieeexplore.ieee.org/document/6142648
+
+### 5.7. Key Points
+
+- Write-write conflicts occur when two clients try to write the same data at the same time. Read-write conflicts occur when one client reads inconsistent data in the middle of another client’s write.
+
+- Pessimistic approaches lock data records to prevent conflicts. Optimistic approaches detect conflicts and fix them.
+
+- Distributed systems see read-write conflicts due to some nodes having received updates while other nodes have not. Eventual consistency means that at some point the system will become consistent once all the writes have propagated to all the nodes.
+
+- Clients usually want read-your-writes consistency, which means a client can write and then immediately read the new value. This can be difficult if the read and the write happen on different nodes.
+
+- To get good consistency, you need to involve many nodes in data operations, but this increases latency. So you often have to trade off consistency versus latency.
+
+- The CAP theorem states that if you get a network partition, you have to trade off availability of data versus consistency.
+
+- Durability can also be traded off against latency, particularly if you want to survive failures with replicated data.
+
+- You do not need to contact all replicants to preserve strong consistency with replication; you just need a large enough quorum.
