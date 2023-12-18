@@ -1162,3 +1162,64 @@ sequenceDiagram
 - Durability can also be traded off against latency, particularly if you want to survive failures with replicated data.
 
 - You do not need to contact all replicants to preserve strong consistency with replication; you just need a large enough quorum.
+
+## Chapter 6. Version Stamps
+
+- **Transactions and NoSQL Databases**: Discusses the criticism of NoSQL databases for their lack of support for transactions. Transactions are a mechanism that helps maintain consistency in databases. However, aggregate-oriented NoSQL databases do support atomic updates within an aggregate, which is a natural unit of update.
+
+- **Consideration of Transactional Needs**: Emphasizes that transactional needs should be considered when choosing a database. The choice of database should align with the specific requirements of the application or system.
+
+- **Limitations of Transactions**: Highlights the limitations of transactions. Even in a transactional system, there are updates that require human intervention and cannot be run within transactions because they would involve holding a transaction open for too long.
+
+- **Use of Version Stamps**: Introduces the concept of version stamps, which can be used to handle updates that cannot be run within transactions. Version stamps are also useful in other situations, especially when moving away from a single-server distribution model.
+
+### 6.1.Business and SystemTransactions
+
+- **Business Transactions**: A business transaction is a sequence of steps that need to be executed atomically.
+    - **Examples**: A customer placing an order involves multiple steps, including checking the customer's credit, reserving the items, and charging the customer's credit card. All these steps need to be executed atomically to ensure that the customer is not charged if the items are not available.
+
+- **System Transactions**: A system transaction is a database operation that needs to be executed atomically. It's usually initiated at the end of a business transaction to minimize lock time.
+    - **Data Changes During Transactions**: As the system transaction is initiated at the end of the business transaction, there is a risk that data may have changed during the business transaction. This can lead to incorrect decisions being made based on stale data.
+
+- **Offline Concurrency Techniques**: Offline concurrency techniques to handle data changes during transactions.
+    - **Optimistic Offline Lock**: Involves re-reading data before an update and checking if it has changed since it was first read.
+
+- **Version Stamps**: Fields in a database record that change every time the underlying data changes. Version stamps can be used to check if data has changed before an update.
+
+- **HTTP Etags**: An example of version stamps in HTTP, where Etags are used to indicate the version of a resource. Etags can be used for conditional updates to ensure that updates are not based on stale data.
+
+- **Conditional Updates in Databases**: Discusses how some databases provide mechanisms for conditional updates similar to HTTP etags. These mechanisms can be used to prevent updates based on stale data.
+
+- **Different Types of Version Stamps**: Describes different ways to construct version stamps, including counters, GUIDs, content hashes, and timestamps. Each method has its own advantages and disadvantages.
+    - **Counters**: Counters are simple to implement but can be difficult to scale out due to the need to coordinate updates between nodes.
+    - **GUIDs**: GUIDs are easy to generate but can be difficult to compare.
+    - **Content Hashes**: Content hashes are easy to compare but can be difficult to generate and store.
+    - **Timestamps**: Timestamps are simple to implement but has the risk of duplicate timestamps if the clock is not synchronized or has low resolution.
+
+- **Composite Version Stamps**: Combine different methods. This can provide the advantages of multiple methods and help avoid update conflicts.
+
+- **Session Consistency**: Version stamps can also be used to provide session consistency, ensuring that a user sees a consistent view of data throughout a session.
+
+### 6.2. Version Stamps on Multiple Nodes
+
+- **Version Stamps in Primary-Secondary Systems**: In these systems, the primary node controls the version stamps, and secondary nodes follow the primary's stamps. 
+
+- **Version Stamps in Peer-to-Peer Systems**: As there's no single authority, if two nodes provide different data, it's necessary to determine which data is more recent or if there's an inconsistency.
+
+- **Counter-Based Version Stamps**: Each time a node updates data, it increments the counter. For example, if one node has a version stamp of 4 and another has 6, the data from the second node is more recent.
+
+- **Version Stamp Histories**: These histories can show if one version of data is an ancestor of another, helping to resolve conflicts.
+
+- **Timestamp-Based Version Stamps**: Highlighting the challenges of ensuring all nodes have a consistent notion of time and the inability of timestamps to detect write-write conflicts.
+
+- **Vector Stamps**: Sets of counters, one for each node. For example, a vector stamp for three nodes might look like `[node1: 43, node2: 54, node3: 12]`. Each time a node updates data, it increments its own counter in the vector stamp.
+    - **Handling Missing Values in Vector Stamps**: Missing values in vector stamps are treated as zero, allowing new nodes to be easily added without invalidating existing vector stamps.
+    - **Conflict Resolution with Vector Stamps**: Notes that while vector stamps can detect inconsistencies, they do not resolve them. The method of conflict resolution depends on the specific domain and is part of the trade-off between consistency and latency.
+
+### 6.3. Key Points
+
+- Version stamps help you detect concurrency conflicts. When you read data, then update it, you can check the version stamp to ensure nobody updated the data between your read and write.
+
+- Version stamps can be implemented using counters, GUIDs, content hashes, timestamps, or a combination of these.
+
+- With distributed systems, a vector of version stamps allows you to detect when different nodes have conflicting updates.
