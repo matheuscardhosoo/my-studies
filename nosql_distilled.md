@@ -1223,3 +1223,345 @@ sequenceDiagram
 - Version stamps can be implemented using counters, GUIDs, content hashes, timestamps, or a combination of these.
 
 - With distributed systems, a vector of version stamps allows you to detect when different nodes have conflicting updates.
+
+## Chapter 7. Map-Reduce
+
+- **Data Storage and Computation in Clusters**: The rise of clusters has changed the way data is stored and processed. In a cluster, data storage and computation need to be distributed across multiple machines, which requires different strategies compared to a single machine setup.
+
+- **Processing Logic in Centralized Databases**: There are two main ways to run processing logic in a centralized database: on the database server itself or on a client machine.
+    - **Processing on the Server**: Processing on the server can be more efficient if a lot of data is involved, but it can increase the load on the server and limit programming convenience.
+    - **Processing on the Client**: Processing on a client machine offers more flexibility in choosing a programming environment, but it requires transferring data from the server, which can be costly.
+
+- **Processing in Clusters**: Allow computation to be spread across multiple machines. However, it's still important to minimize data transfer across the network by processing data on the same node where it's stored.
+
+- **Map-Reduce Pattern**: Designed to take advantage of multiple machines in a cluster while keeping processing and data together on the same machine. This pattern was popularized by Google's MapReduce framework and is implemented in various ways in different systems.
+    - **Citation: Scatter-Gather [Hohpe and Woolf]**: This is a reference to the Scatter-Gather pattern, which involves dividing a task into subtasks that can be processed in parallel and then combining the results. The map-reduce pattern is a form of Scatter-Gather.
+        - **Link**: https://www.enterpriseintegrationpatterns.com/patterns/messaging/BroadcastAggregate.html
+    - **Citation: Google’s MapReduce framework [Dean and Ghemawat]**: This is a reference to the original paper on Google's MapReduce framework, which introduced the map-reduce pattern to a wide audience.
+        - **Link**: https://static.googleusercontent.com/media/research.google.com/en//archive/mapreduce-osdi04.pdf
+    - **Citation: Hadoop project**: This is a reference to the Hadoop project, which includes a widely used open-source implementation of the map-reduce pattern.
+        - **Link**: https://hadoop.apache.org/
+
+### 7.1. Basic Map-Reduce
+
+- **Data Aggregation in Distributed Systems**:
+    - **Example Context**: An e-commerce system, orders could be an aggregate, with each order containing line items. Each line item has a product ID, quantity, and price. This aggregate structure allows for efficient access to complete orders.
+    - **Challenges**: However, this aggregate structure makes it difficult to calculate the total revenue for a product over a certain period. To do this, you would need to access all orders containing that product, which could be distributed across many machines.
+
+- **Map-Reduce as a Solution**: Introduces the map-reduce pattern as a solution to the above problem. The map function takes an aggregate as input and produces key-value pairs as output. In the e-commerce example, the input would be an order, and the output would be key-value pairs for each line item, with the product ID as the key and a map containing the quantity and price as the value.
+
+```mermaid
+---
+title: A map function reads records from the database and emits key- value pairs.
+---
+graph LR
+    subgraph order ["Order"]
+        id["id: 1001"]
+        customer["customer: Ann"]
+        shipping_addresses["shipping_addresses: ..."]
+        payments_details["payments_details: ..."]
+        payments_details["payments_details: ..."]
+        subgraph "line_items:"
+            line_item_1["product_id: puerh | quantity: 8 | unit_price: $3.25 | total_price: $26.00"]
+            line_item_2["product_id: jasmine | quantity: 1 | unit_price: $4.50 | total_price: $4.50"]
+            line_item_3["product_id: earl grey | quantity: 2 | unit_price: $2.50 | total_price: $5.00"]
+        end
+    end
+
+    subgraph map_function ["Map Function"]
+        map["map(order) -> (product_id, (quantity, unit_price))"]
+
+        mapped_line_item_1["puerh: quantity: 8 | unit_price: $3.25"]
+        mapped_line_item_2["jasmine: quantity: 1 | unit_price: $4.50"]
+        mapped_line_item_3["earl grey: quantity: 2 | unit_price: $2.50"]
+
+        map --> mapped_line_item_1
+        map --> mapped_line_item_2
+        map --> mapped_line_item_3
+    end
+
+    order ==> map
+```
+
+- **Parallelization in Map-Reduce**: Each map function operates independently, allowing them to run in parallel across multiple nodes. This leads to efficient data access and high levels of parallelism.
+
+- **Complexity of Map Functions**: Map functions can perform complex operations, as long as they only depend on a single aggregate's worth of data. For example, a map function could calculate the total price for each line item in an order.
+
+- **Role of the Reduce Function**: The reduce function takes the output of multiple map functions and combines them. For instance, if the map function outputs line items for a specific product, the reduce function could sum the quantities and revenues to provide total sales data for that product.
+
+- **Data Movement in Map-Reduce**: The map-reduce framework ensures that map tasks are run on the correct nodes and that data is moved to the reduce function. All values for a single key are collected and passed to the reduce function at once.
+
+- **Writing Map-Reduce Jobs**: Notes that to run a map-reduce job, you only need to write the map and reduce functions. The framework handles the rest, including data distribution and collection.
+
+```mermaid
+---
+title: A reduce function takes several key-value pairs with the same key and aggregates them into one.
+---
+graph LR
+    subgraph map_function ["Map Function"]
+        map["map(order) -> (product_id, (quantity, unit_price))"]
+
+        mapped_line_item_1["puerh: quantity: 8 | unit_price: $3.25"]
+        mapped_line_item_2["jasmine: quantity: 1 | unit_price: $4.50"]
+        mapped_line_item_3["earl grey: quantity: 2 | unit_price: $2.50"]
+
+        map --> mapped_line_item_1
+        map --> mapped_line_item_2
+        map --> mapped_line_item_3
+    end
+
+    subgraph reduce_function["Reduce Functions reduce(product_id, ...) -> (product_id, ...)"]
+        reduce_line_item_1["reduce(puerh, ...)"]
+        reduce_line_item_2["reduce(jasmine, ...)"]
+        reduce_line_item_3["reduce(earl grey, ...)"]
+        
+        reduced_line_item_1["puerh: total_quantity: 34 | total_price: $106.00"]
+        reduced_line_item_2["jasmine: total_quantity: 12 | total_price: $54.00"]
+        reduced_line_item_3["earl grey: total_quantity: 23 | total_price: $57.50"]
+
+        reduce_line_item_1 --> reduced_line_item_1
+        reduce_line_item_2 --> reduced_line_item_2
+        reduce_line_item_3 --> reduced_line_item_3
+    end
+
+    mapped_line_item_1 ==...==> reduce_line_item_1
+    mapped_line_item_2 ==...==> reduce_line_item_2
+    mapped_line_item_3 ==...==> reduce_line_item_3
+```
+
+### 7.2. Partitioning and Combining
+
+- **Map-Reduce Job Structure**: The basic structure of a map-reduce job typically involves a single reduce function. All outputs from the map tasks are combined and passed to this reduce function.
+
+```mermaid
+---
+title: Partitioning allows reduce functions to run in parallel on different keys.
+---
+graph LR
+    subgraph node_1 ["Node 1"]
+        subgraph node_1_map_results ["Map Results"]
+            node_1_map_results_item_1["(puerh, 26)"]
+            node_1_map_results_item_2["(genmaicha, 12)"]
+            node_1_map_results_item_3["(dragonwell, 16)"]
+            node_1_map_results_item_4["(dragonwell, 13)"]
+            node_1_map_results_item_5["(puerh, 36)"]
+        end
+        subgraph node_1_map_segregated_results_1 ["Map Segregated Results"]
+            node_1_map_segregated_results_1_item_1["(puerh, 26)"]
+            node_1_map_segregated_results_1_item_2["(genmaicha, 12)"]
+            node_1_map_segregated_results_1_item_3["(puerh, 36)"]
+        end
+        subgraph node_1_map_segregated_results_2 ["Map Segregated Results"]
+            node_1_map_segregated_results_2_item_1["(dragonwell, 16)"]
+            node_1_map_segregated_results_2_item_2["(dragonwell, 13)"]
+        end
+
+        node_1_map(("Map")) --> node_1_map_results
+        node_1_map_results --> node_1_map_segregated_results_1
+        node_1_map_results --> node_1_map_segregated_results_2
+    end
+
+    subgraph node_2 ["Node 2"]
+        subgraph node_2_map_results ["Map Results"]
+            node_2_map_results_item_1["(genmaicha, 18)"]
+            node_2_map_results_item_2["(genmaicha, 10)"]
+            node_2_map_results_item_3["(dragonwell, 38)"]
+            node_2_map_results_item_4["(hojicha, 9)"]
+            node_2_map_results_item_5["(puerh, 44)"]
+        end
+        subgraph node_2_map_segregated_results_1 ["Map Segregated Results"]
+            node_2_map_segregated_results_1_item_1["(genmaicha, 18)"]
+            node_2_map_segregated_results_1_item_2["(genmaicha, 10)"]
+            node_2_map_segregated_results_1_item_3["(puerh, 44)"]
+        end
+        subgraph node_2_map_segregated_results_2 ["Map Segregated Results"]
+            node_2_map_segregated_results_2_item_1["(dragonwell, 38)"]
+            node_2_map_segregated_results_2_item_2["(hojicha, 9)"]
+        end
+
+        node_2_map(("Map")) --> node_2_map_results
+        node_2_map_results --> node_2_map_segregated_results_1
+        node_2_map_results --> node_2_map_segregated_results_2
+    end
+
+    subgraph node_3 ["Node 3"]
+        subgraph node_3_grouped_results ["Reduce Preparation"]
+            node_3_map_results_item_1["(dragonwell, 18)"]
+            node_3_map_results_item_2["(dragonwell, 13)"]
+            node_3_map_results_item_3["(dragonwell, 38)"]
+            node_3_map_results_item_4["(hojicha, 9)"]
+        end
+
+        node_3_grouped_results --> node_3_map(("Reduce"))
+    end
+
+    subgraph node_4 ["Node 3"]
+        subgraph node_4_grouped_results ["Reduce Preparation"]
+            node_4_map_results_item_1["(puerh, 26)"]
+            node_4_map_results_item_2["(genmaicha, 12)"]
+            node_4_map_results_item_3["(puerh, 36)"]
+            node_4_map_results_item_4["(genmaicha, 18)"]
+            node_4_map_results_item_5["(genmaicha, 10)"]
+            node_4_map_results_item_6["(puerh, 44)"]
+        end
+
+        node_4_grouped_results --> node_4_map(("Reduce"))
+    end
+
+    node_1_map_segregated_results_1 --> node_4_grouped_results
+    node_1_map_segregated_results_2 --> node_3_grouped_results
+    node_2_map_segregated_results_1 --> node_4_grouped_results
+    node_2_map_segregated_results_2 --> node_3_grouped_results
+```
+
+- **Increasing Parallelism**: This can be achieved by partitioning the output of the map tasks, allowing multiple reduce functions to operate in parallel. Each reduce function operates on the results of a single key.
+
+- **Reducing Data Transfer**: This can be achieved by using a combiner function, which combines all the data for the same key into a single value, reducing the amount of data that needs to be moved between nodes.
+
+- **Combinable Reducers**: Reduce functions whose output matches their input. Not all reduce functions are combinable, but when they are, the map-reduce framework can run in both parallel and series, providing extra flexibility.
+
+```mermaid
+---
+title: Combining reduces data before sending it across the network.
+---
+graph LR
+    subgraph node_1 ["Node 1"]
+        subgraph node_1_map_results ["Map Results"]
+            node_1_map_results_item_1["(puerh, 26)"]
+            node_1_map_results_item_2["(genmaicha, 12)"]
+            node_1_map_results_item_3["(puerh, 36)"]
+            node_1_map_results_item_4["(genmaicha, 8)"]
+            node_1_map_results_item_5["(puerh, 20)"]
+            node_1_map_results_item_6["(genmaicha, 16)"]
+            node_1_map_results_item_7["(puerh, 40)"]
+            node_1_map_results_item_8["(puerh, 6)"]
+        end
+        subgraph node_1_map_combined_results_1 ["Map Combined Results"]
+            node_1_map_combined_results_1_item_1["(puerh, 128)"]
+            node_1_map_combined_results_1_item_2["(genmaicha, 36)"]
+        end
+
+        node_1_map(("Map")) --> node_1_map_results
+        node_1_map_results --> node_1_combine(("Combine"))
+        node_1_combine --> node_1_map_combined_results_1
+    end
+
+    subgraph node_2 ["Node 2"]
+        node_2_reduce(("Reduce"))
+    end
+
+    node_1_map_combined_results_1 --> node_2_reduce
+```
+
+- **Non-Combinable Reducers**: If a reduce function's output doesn't match its input, it can't be used as a combiner. In such cases, the processing may need to be separated into pipelined map-reduce steps.
+
+```mermaid
+---
+title: This reduce function, which counts how many unique customers order a particular tea, is not combinable.
+---
+graph LR
+    subgraph map_results ["Map Results"]
+        map_results_item_1["(dragonwell, ann)"]
+        map_results_item_2["(puerh, ann)"]
+        map_results_item_3["(puerh, brian)"]
+        map_results_item_4["(genmaicha, claire)"]
+        map_results_item_5["(puerh, david)"]
+        map_results_item_6["(dragonwell, ann)"]
+        map_results_item_7["(hojicha, ann)"]
+        map_results_item_8["(puerh, claire)"]
+        map_results_item_9["(genmaicha, claire)"]
+    end
+    subgraph reduce_results ["Map Combined Results"]
+        reduce_results_item_1["(dragonwell, 1)"]
+        reduce_results_item_2["(puerh, 3)"]
+        reduce_results_item_3["(genmaicha, 1)"]
+        reduce_results_item_4["(hojicha, 1)"]
+    end
+
+    map_results --> reduce(("Reduce"))
+    reduce --> reduce_results
+```
+
+### 7.3. Composing Map-Reduce Calculations
+
+- **Map-Reduce Constraints**: Requires computations to be structured in a specific way. For instance, a map task can only operate on a single aggregate, and a reduce task can only operate on a single key.
+
+- **Examples**:
+    - **Averages**: Explains the process of calculating averages in a map-reduce job. This involves taking the total amount and count of orders from each group, combining those, and then calculating the average from the combined sum and count.
+
+    ```mermaid
+    graph LR
+        A[Group 1] --> B[Total Amount and Count]
+        C[Group 2] --> D[Total Amount and Count]
+        B --> E[Combined Sum and Count]
+        D --> E
+        E --> F[Average]
+    ```
+    - **Counting**: Describes how counts are performed in a map-reduce job. The mapping function emits count fields with a value of 1, which can be summed to get a total count.
+
+    ```mermaid
+    graph LR
+        A[Map Task 1] --> B[Count: 1]
+        C[Map Task 2] --> D[Count: 1]
+        B --> E[Total Count]
+        D --> E
+    ```
+
+- **Composable Operations in Map-Reduce**: Highlights the importance of structuring calculations around operations that fit well with the reduce operation. Not all operations are composable, meaning they can't be broken down into smaller operations that can be performed independently and then combined.
+
+
+#### 7.3.1. A Two Stage Map-Reduce Example
+
+- **Staged Map-Reduce Calculations**: Concept of breaking down complex map-reduce calculations into stages. Each stage's output serves as the next stage's input, similar to a pipes-and-filters approach. For example, to compare product sales for each month of a year to the prior year, you could first create records showing the aggregate figures for a single product in a single month. Then, in the next stage, you could use these records to compare one month's results with the same month in the prior year.
+
+    ```mermaid
+    graph LR
+        A[Original Order Records] --> B[Stage 1: Monthly Sales Records]
+        B --> C[Stage 2: Year-on-Year Comparison]
+    ```
+
+- **Composite Keys in Map-Reduce**: Allows to reduce records based on the values of multiple fields. For instance, in the first stage of the above example, you could use a composite key consisting of the product and month to create the monthly sales records.
+
+- **Year-Based Mapping**: For instance, in the second stage of the above example, a record from 2011 could populate the current year quantity, while a record from 2010 could populate the prior year quantity.
+
+- **Merging Records in Reduce**: This involves combining values by summing them, allowing outputs from different years to be reduced to a single value.
+
+    ```mermaid
+    graph LR
+        A[2011 Record] --> B[Current Year Quantity]
+        C[2010 Record] --> D[Prior Year Quantity]
+        B --> E[Merged Record]
+        D --> E
+    ```
+
+- **Benefits of Staged Map-Reduce**: This makes the job easier to write and allows for potential reuse of intermediate outputs. These outputs can be saved in the data store, forming a materialized view, which can save time in both programming and execution.
+
+- **Map-Reduce in Different Languages**: Notes that while map-reduce can be implemented in any programming language, some languages are specifically designed for map-reduce computations. These languages, such as Apache Pig and Hive, can make it easier to write map-reduce programs.
+
+- **Importance of Map-Reduce**: Emphasizes the importance of the map-reduce pattern, particularly for processing high volumes of data in a cluster-oriented approach. The pattern is well-suited to running on a cluster and fits well with aggregate-oriented databases.
+
+### 7.4. Further Reading
+
+- **Database-Specific Map-Reduce**: Emphasizes the importance of understanding the specific map-reduce implementation of the database you're using. Each database has its own unique approach and vocabulary, which you'll need to familiarize yourself with.
+
+- **Maximizing Maintainability and Performance**: Discusses the need to structure map-reduce jobs in a way that maximizes both maintainability and performance. This involves understanding the general principles of map-reduce, beyond the specifics of any one database.
+
+- **Learning from Hadoop**: Suggests that resources on Hadoop, a tool that heavily uses map-reduce, can be a valuable source of information. Even though Hadoop is not a database, the principles of writing effective map-reduce tasks in Hadoop can be applied in other contexts.
+
+- **Adapting to Different Systems**: Notes that while learning from Hadoop can be useful, it's important to adapt this knowledge to the specifics of the system you're using. The details of map-reduce implementation can vary between Hadoop and other systems.
+
+### 7.5. Key Points
+
+- Map-reduce is a pattern to allow computations to be parallelized over a cluster.
+
+- The map task reads data from an aggregate and boils it down to relevant key-value pairs. Maps only read a single record at a time and can thus be parallelized and run on the node that stores the record.
+
+- Reduce tasks take many values for a single key output from map tasks and summarize them into a single output. Each reducer operates on the result of a single key, so it can be parallelized by key.
+
+- Reducers that have the same form for input and output can be combined into pipelines. This improves parallelism and reduces the amount of data to be transferred.
+
+- Map-reduce operations can be composed into pipelines where the output of one reduce is the input to another operation’s map.
+
+- If the result of a map-reduce computation is widely used, it can be stored as a materialized view.
+
+- Materialized views can be updated through incremental map-reduce operations that only compute changes to the view instead of recomputing everything from scratch.
