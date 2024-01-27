@@ -1565,3 +1565,289 @@ graph LR
 - If the result of a map-reduce computation is widely used, it can be stored as a materialized view.
 
 - Materialized views can be updated through incremental map-reduce operations that only compute changes to the view instead of recomputing everything from scratch.
+
+## Chapter 8. Key-Value Databases
+
+1. **Understanding**: The basic structure of a key-value store is essentially a hash table. The primary method of accessing data in a key-value store is through the key. For example, consider a simple table with two columns: ID and Name. The ID is the key, and the Name is the value.
+
+2. **Data Types**: The data types in key-value stores are highly flexible. Unlike in a traditional RDBMS where the value column might be restricted to a specific data type, in a key-value store, the value can be of any type.
+
+3. **Data Persistence**: When a key-value pair is provided, if the key already exists in the store, the current value is overwritten. If the key does not exist, a new entry is created.
+
+    ```mermaid
+    graph LR
+        A[Key-Value Pair] -->|If Key Exists| B[Overwrite Value]
+        A -->|If Key Doesn't Exist| C[Create New Entry]
+    ```
+
+4. **Comparing Terminology Across Databases**: Notes that the terminology used in different databases can vary. For instance, what is referred to as a 'table' in Oracle might be called a 'bucket' in Riak. Understanding these differences is crucial when working with different databases.
+
+Oracle | Riak
+--- | ---
+database instance | Riak cluster
+table | bucket
+row | key-value
+row ID | key
+
+### 8.1. What Is a Key-Value Store?
+
+1. **Simplicity**: Key-value stores are extremely simple from an API perspective, with only three operations: get, put, and delete. The value is a blob that the store doesn't interpret; it's up to the application to understand the stored data.
+
+2. **Performance and Scalability**: Once key-value stores always use primary-key access, they generally perform well and can be easily scaled.
+
+3. **Variety of Databases**:
+    - **[Riak](https://riak.com/)**
+    - **[Redis](https://redis.io/)**
+    - **[Memcached DB](https://memcached.org)**
+    - **[Berkeley DB](https://www.oracle.com/database/technologies/related/berkeleydb.html)**
+    - **[HamsterDB](https://hamsterdb.com/)**
+    - **[Amazon DynamoDB](https://aws.amazon.com/dynamodb/)**
+    - **[Project Voldemort](https://www.project-voldemort.com/voldemort/)**
+
+4. **Data Structures Flexibility**: Notes that in some key-value stores, like Redis, the stored aggregate doesn't have to be a domain object — it could be any data structure. Redis supports storing lists, sets, hashes and can perform range, diff, union, and intersection operations.
+
+5. **Bucketing in Key-Value Stores**: Explains the concept of bucketing in key-value stores, using Riak as an example. Buckets are a way to segment keys, acting as flat namespaces for the keys.
+
+6. **Storing Different Objects in a Single Bucket**:
+    - **Pros**: simple and easy to implement.
+    - **Cons**: increases the chance of key conflicts.
+
+    ```mermaid
+    ---
+    title: Storing all the data in a single bucket
+    ---
+    flowchart TB
+        subgraph "UserData (bucket)"
+            subgraph "SessionId (key)"
+                user_1_profile["UseProfile"]
+                user_1_session_data["UserSessionData"]
+                subgraph "ShoppingCart"
+                    user_1_cart_item_1["CartItem"]
+                    user_1_cart_item_2["CartItem"]
+                    user_1_cart_item_3["CartItem"]
+                end
+            end
+        end
+    ```
+
+7. **Segmenting Data with Key Design and Multiple Buckets**: There are two ways to segment data in key-value stores, both allow reading only the object you need without having to change key design.
+    - changing the key design;
+
+        ```mermaid
+        ---
+        title: Append the name of the object to the key
+        ---
+        flowchart TB
+            subgraph "UserData (bucket)"
+                subgraph "SessionId_UserProfile (key)"
+                    user_1_profile["UseProfile"]
+                    user_1_session_data["UserSessionData"]
+                end
+                subgraph "SessionId_ShoppingCart (key)"
+                    subgraph "ShoppingCart"
+                        user_1_cart_item_1["CartItem"]
+                        user_1_cart_item_2["CartItem"]
+                        user_1_cart_item_3["CartItem"]
+                    end
+                end
+            end
+        ```
+
+    - using multiple buckets.
+
+        ```java
+        Bucket bucket = client.fetchBucket(bucketName).execute();
+        DomainBucket<UserProfile> profileBucket = DomainBucket.builder(bucket, UserProfile.class).build();
+        ```
+
+        ```mermaid
+        ---
+        title: Use multiple buckets
+        ---
+        flowchart TB
+            subgraph "UserData (bucket)"
+                subgraph "SessionId (key)"
+                    user_1_profile["UseProfile"]
+                    user_1_session_data["UserSessionData"]
+                end
+            end
+            subgraph "ShoppingCart (bucket)"
+                subgraph "SessionId (key)"
+                    subgraph "ShoppingCart"
+                        user_1_cart_item_1["CartItem"]
+                        user_1_cart_item_2["CartItem"]
+                        user_1_cart_item_3["CartItem"]
+                    end
+                end
+            end
+        ```
+
+8. **Storing Random Data Structures**: Notes that key-value stores like Redis also support storing random data structures. This feature can be used to store lists of things, like states or address types, or an array of user’s visits.
+
+### 8.2. Key-Value Store Features
+
+When considering a key-value store, it's important to understand the features it provides. These features can vary widely between different key-value stores, so it's important to understand the specific features of the store you're using. Here, we'll discuss some of the common features of key-value stores and compare them to the features of relational databases.
+
+#### 8.2.1. Consistency
+
+1. **Single Key Operations and Consistency**: Consistency in key-value stores applies only to operations on a single key. These operations are typically get, put, or delete. Optimistic writes can be implemented but are costly due to the data store's inability to determine a change in value.
+
+2. **Eventual Consistency in Distributed Key-Value Stores**: Due to replication of values across nodes, conflicts can arise during updates. Riak resolves these conflicts in two ways:
+    - either the latest write wins;
+    - all conflicting values are returned for the client to resolve.
+
+3. **Bucket Creation and Consistency Settings in Riak**: Buckets, which are used to namespace keys and reduce collisions, can be set up with default values for consistency. For instance, a write might only be considered successful when the data is consistent across all nodes where it's stored.
+
+    ```java
+    Bucket bucket = connection
+        .createBucket(bucketName)
+        .withRetrier(attempts(3))
+        .allowSiblings(siblingsAllowed)
+        .nVal(numberOfReplicasOfTheData)
+        .w(numberOfNodesToRespondToWrite)
+        .r(numberOfNodesToRespondToRead)
+        .execute();
+    ```
+
+4. **Balancing Consistency and Performance**: Increased consistency can lead to decreased performance, as more nodes need to be contacted to ensure consistency. This trade-off needs to be considered when choosing consistency settings.
+    - On Riak, set the `numberOfNodesToRespondToWrite` to be the same as `nVal` is a way to ensure consistency. To deal with conflicts, set the `allowSiblings` flag to false and let the last write win.
+
+#### 8.2.2. Transactions
+
+1. **Transaction Handling**: While there are no universal guarantees on write operations, many data stores implement their own versions of transactions.
+
+2. **Quorum Concept in Distributed Systems**: A method to ensure consistency and availability. A quorum is the minimum number of votes that a distributed transaction has to obtain in order to be allowed to perform an operation in a distributed system.
+
+3. **Write Operations and Replication Factor**: For instance, if a cluster has a replication factor (`N`) of 5 and a quorum value (`W`) value of 3, a write operation is considered successful only when it is written and acknowledged as successful on at least 3 nodes.
+
+    ```mermaid
+    graph LR
+        A[Cluster] --> B[N: 5]
+        A --> C[W: 3]
+        B --> D[Write Success: At least 3 nodes]
+        C --> D
+    ```
+
+4. **Write Tolerance in Distributed Systems**: In the previous example, with a replication factor (`N`) of 5 and a quorum value (`W`) value of 3, the cluster can tolerate `N - W = 2` nodes being down for write operations. However, some data on those nodes would be lost for read operations.
+
+    ```mermaid
+    graph LR
+        A[Cluster] --> B[N: 5]
+        A --> C[W: 3]
+        B --> D[Write Tolerance: N - W = 2 nodes]
+        C --> D
+    ```
+
+#### 8.2.3. Query Features
+
+1. **Query Limitations**: Key-value stores are limited to querying by key. If there's a need to query by an attribute of the value, the application must read the value to determine if it meets the conditions.
+
+2. **Key Design Considerations**: Key design is important in key-value stores, as it determines how the data is stored and accessed. The key can be generated using an algorithm provided by the user - like an UUID generator, a combination of important fields (from inside or outside the database), or some time-marked value.
+    - If a field is needed to be used in a query, it's a good idea to include it in the key.
+    - The `expiry_secs` property can be used to expire keys after a certain time interval.
+
+3. **Example**: Consider a key-value store that stores user profiles.
+    - Storing a value:
+
+        ```java
+        Bucket bucket = getBucket(bucketName);
+        IRiakObject riakObject = bucket.store(key, value).execute();
+        ```
+
+    - Retrieving a value:
+
+        ```java
+        Bucket bucket = getBucket(bucketName);
+        IRiakObject riakObject = bucket.fetch(key).execute(); 
+        byte[] bytes = riakObject.getValue();
+        String value = new String(bytes);
+        ```
+    
+    - Deleting a value:
+
+        ```java
+        Bucket bucket = getBucket(bucketName);
+        bucket.delete(key).execute();
+        ```
+    
+    - Riak HTTP-based interface:
+
+        ```bash
+        curl -v -X POST -d 'value' http://localhost:8098/buckets/session/keys/<key>
+        ```
+
+        ```bash
+        curl -v -X PUT -d 'value' http://localhost:8098/buckets/bucketName/keys/<key>
+        ```
+
+        ```bash
+        curl -v http://localhost:8098/buckets/bucketName/keys/<key>
+        ```
+
+        ```bash
+        curl -v -X DELETE http://localhost:8098/buckets/bucketName/keys/<key>
+        ```
+
+#### 8.2.4. Structure of Data
+
+1. **Value Flexibility**: The value can be of any type, such as a blob, text, JSON, XML, etc.
+
+2. **Data Type Specification**: This is typically done using a specific attribute in the request made to the store.
+    - For example, in a key-value store like Riak, the `Content-Type` in the `POST` request can be used to specify the data type of the value.
+
+        ```http
+        POST /bucket/key HTTP/1.1
+        Host: localhost:8098
+        Content-Type: application/json
+        Content-Length: 30
+
+        {
+            "key": "example",
+            "value": "Hello, World!"
+        }
+        ```
+
+    - In this example, the `Content-Type` header is set to `application/json`, indicating that the value is a JSON object.
+
+#### 8.2.5. Scaling
+
+1. **Sharding**: A method of distributing data across multiple nodes based on the key's value. For instance, keys starting with `a` might be stored on one node, while keys starting with `b` might be stored on another.
+
+    ```mermaid
+    graph LR
+        A[Key: a123] --> B[Node 1]
+        C[Key: b456] --> D[Node 2]
+    ```
+
+2. **Potential Issues with Sharding**: If a node goes down, all data stored on that node becomes unavailable, and new data with keys that would be stored on that node cannot be written.
+
+3. **Controlling CAP Theorem Aspects in Riak**: Riak allows you to control aspects of the CAP Theorem with `N`, `R`, and `W` values.
+    - `N` is the number of nodes to store the key-value replicas;
+    - `R` is the number of nodes that must have the data being fetched before the read is considered successful;
+    - `W` is the number of nodes the write must be written to before it is considered successful.
+
+    ```mermaid
+    graph LR
+        A[Riak Cluster] --> B[N: 3]
+        A --> C[R: 2]
+        A --> D[W: 2]
+    ```
+
+4. **Fine-Tuning Node Failures**: Discusses how these settings allow us to fine-tune node failures for read or write operations. We can change these values for better read availability or write availability based on our needs.
+
+### 8.3. Suitable Use Cases
+
+1. **Fast Data Access and High Scalability**: Key-value stores are well-suited to applications that require fast data access. This is because they can be easily scaled and provide fast access to data through a single request.
+    - **Examples**: user profiles, shopping carts, and session data.
+2. **Unstructured Data**: Key-value stores are well-suited to storing unstructured data, as they don't require a schema. This allows for flexibility in the data being stored.
+    **Examples**: recommendation engines, document storage, and streaming data.
+
+### 8.4.When Not to Use
+
+1. **Data Relationships**: Discusses the limitations of key-value stores when it comes to handling relationships between different sets of data. While some key-value stores offer features like link-walking, they are generally not the best solution for managing data relationships.
+
+2. **Transaction Management**: Highlights the challenges of managing multi operation transactions in key-value stores. If a failure occurs during the saving of multiple keys, there's no built-in mechanism to revert or roll back the rest of the operations.
+
+3. **Data Querying**: Explains the difficulties of querying data based on the value part of the key-value pairs in key-value stores. While some products like Riak Search or indexing engines like Lucene or Solr offer some capabilities, key-value stores are generally not optimized for this kind of operation.
+
+4. **Set Operations**: Describes the limitations of key-value stores when it comes to performing operations on multiple keys at the same time. Since operations are typically limited to one key at a time, any need to operate on multiple keys must be handled from the client side.
