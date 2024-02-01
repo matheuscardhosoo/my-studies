@@ -2108,3 +2108,340 @@ join | DBRef or embedded document
 1. **Data Relationships**: Strong relationships between data are not well-suited to document databases. While some document databases offer features like DBRefs or embedded documents, they are generally not the best solution for managing data relationships.
 
 2. **Data Cohesion**: Once it's schemaless, it's hard to enforce data cohesion. This can lead to data inconsistencies and data quality issues.
+
+## Chapter 10. Column-Family Stores
+
+1. **Understanding**: Column-family stores are a type of NoSQL database that store data in columns rather than rows. This allows for efficient storage and retrieval of data, as well as the ability to store large amounts of data.
+
+2. **Examples**: 
+    - **[Cassandra](https://cassandra.apache.org/)**
+    - **[HBase](https://hbase.apache.org/)**
+    - **[Hypertable](http://hypertable.org/)**
+    - **[Google Bigtable](https://cloud.google.com/bigtable/)**
+
+3. **Terminology Comparison**:
+
+RDBMS | Cassandra
+--- | ---
+database instance | Cassandra cluster
+database | keyspace
+table | column family
+row | row
+column (same for all rows) | column (can be different per row)
+
+### 10.1. What Is a Column-Family Data Store?
+
+1. **Column-Family Databases**: Discusses the concept of column-family databases, which store data in rows with many columns associated with a row key. Column families are groups of related data that are often accessed together. For example, for a customer, we would often access their profile information at the same time, but not their orders.
+
+    ```mermaid
+    ---
+    title: Cassandra’s data model with column families
+    ---
+    flowchart LR
+        subgraph keyspace ["User (Keyspace)"]
+            subgraph user_profile ["User Profile (Column Family)"]
+                subgraph first_name_column ["First Name (Column)"]
+                    user_1_first_name["User 1"]
+                    user_2_first_name["User 2"]
+                    user_3_first_name["User 3"]
+                end
+                subgraph last_name_column ["Last Name (Column)"]
+                    user_1_last_name["User 1"]
+                    user_2_last_name["User 2"]
+                    user_3_last_name["User 3"]
+                end
+                subgraph email_column ["Email (Column)"]
+                    user_1_email["User 1"]
+                    user_2_email["User 2"]
+                    user_3_email["User 3"]
+                end
+
+                subgraph first_name_column ["User 1 (Row)"]
+                    user_1_first_name --> user_1_last_name
+                    user_1_last_name --> user_1_email
+                end
+                subgraph first_name_column ["User 2 (Row)"]
+                    user_2_first_name --> user_2_last_name
+                    user_2_last_name --> user_2_email
+                end
+                subgraph first_name_column ["User 3 (Row)"]
+                    user_3_first_name --> user_3_last_name
+                    user_3_last_name --> user_3_email
+                end
+            end
+        end
+    ```
+
+2. **Cassandra**: Highlights Cassandra as a popular column-family database. Cassandra is known for its speed and scalability, with write operations spread across the cluster. There is no primary node in a Cassandra cluster, so any read and write can be handled by any node in the cluster.
+
+### 10.2. Features
+
+1. **Data Structure in Cassandra**: The basic unit of storage is a column, which consists of a name-value pair and a timestamp. The name also behaves as the key. The timestamp is used for various purposes such as resolving write conflicts and expiring data.
+
+2. **Rows and Column Families**:
+    - **Rows**: A collection of columns linked to a key.
+    - **Column Families**: A collection of similar rows. In a standard column family, the columns are simple columns.
+
+    ```json
+    {
+        "name": "martin-fowler",
+        "value": {
+            "firstName": "Martin",
+            "lastName": "Fowler",
+            "location": "Boston"
+        }
+    }
+    ```
+
+    ```json
+    {
+        "pramod-sadalage": {
+            "firstName": "Pramod",
+            "lastName": "Sadalage",
+            "lastVisit": "2012/12/12"
+        },
+        "martin-fowler": {
+            "firstName": "Martin",
+            "lastName": "Fowler",
+            "location": "Boston"
+        }
+    }
+    ```
+
+3. **Super Columns and Super Column Families**:
+    - **Super Columns**: A super column consists of a name and a value which is a map of columns.
+    - **Super Column Families**: A super column family is created when we use super columns to create a column family.
+
+    ```json
+    {
+        "name": "billing:martin-fowler",
+        "value": {
+            "address": {
+                "name": "address:default",
+                "value": {
+                    "fullName": "Martin Fowler",
+                    "street": "100 N. Main Street",
+                    "zip": "20145"
+                }
+            },
+            "billing": {
+                "name": "billing:default",
+                "value": {
+                    "creditcard": "8888-8888-8888-8888",
+                    "expDate": "12/2016"
+                }
+            }
+        }
+    }
+    ```
+
+    ```json
+    {
+        "billing:martin-fowler": {
+            "address:default": {
+                "fullName": "Martin Fowler",
+                "street": "100 N. Main Street",
+                "zip": "20145"
+            },
+            "billing:default": {
+                "creditcard": "8888-8888-8888-8888",
+                "expDate": "12/2016"
+            }
+        }
+    }
+    ```
+
+4. **Keyspaces in Cassandra**: A keyspace is similar to a database in RDBMS where all column families related to the application are stored.
+
+    ```cql
+    create keyspace ecommerce
+    ```
+
+#### 10.2.1. Consistency
+
+1. **Write Operation in Cassandra**: The data is first recorded in a commit log, then written to an in-memory structure known as memtable. Writes are batched in memory and periodically written out to structures known as SSTable. SSTables are immutable; if there are changes to the data, a new SSTable is written.
+
+2. **Read Operation and Consistency Levels**:
+    - **ONE**: The data is read from the first replica that responds. This is the fastest read operation, but the data may be stale.
+    - **QUORUM**: The data is read from the majority of the replicas. This is the slowest read operation, but the data is the most up-to-date.
+    - **ALL**: The data is read from all replicas. This is the slowest read operation, but the data is the most up-to-date. This is not fault-tolerant, as it requires all replicas to be up.
+
+3. **Write Operation and Consistency Levels**:
+    - **ONE**: The data is written to the first replica that responds. This is the fastest write operation, but the data may be lost if the replica fails.
+    - **QUORUM**: The data is written to the majority of the replicas. This is the slowest write operation, but the data is the most durable.
+    - **ALL**: The data is written to all replicas. This is the slowest write operation, but the data is the most durable. This is not fault-tolerant, as it requires all replicas to be up.
+
+4. **Keyspace Creation and Replication Factor**: During keyspace creation, we can configure how many replicas of the data we need to store. This number determines the replication factor of the data.
+    - **Example**: With a replication factor of 3 and a write/read consistency level of QUORUM, the data is written to and read from the majority of the replicas (2 out of 3). This ensures that the data is the most up-to-date and durable (`R + W > N`).
+
+    ```cql
+
+5. **Hinted Handoff**: While a node is down, the data that was supposed to be stored by that node is handed off to other nodes. As the node comes back online, the changes made to the data are handed back to the node. This technique is known as hinted handoff.
+
+6. **Read Repair**: When a read operation is performed, the data is compared across replicas. If the data is inconsistent, the data is repaired across the replicas.
+
+#### 10.2.2. Transactions
+
+1. **Atomicity in Cassandra**: A write operation is atomic at the row level. This means that when inserting or updating columns for a given row key, the operation will be treated as a single write and will either completely succeed or fail. 
+
+2. **Commit Logs and Memtables**: Writes are first recorded in commit logs and memtables, and are only considered successful when both these operations are successful. If a node goes down, the commit log is used to apply changes to the node when it comes back online.
+
+3. **External Transaction Libraries**: Mentions the use of external transaction libraries to synchronize writes and reads in Cassandra. Libraries such as ZooKeeper and Cages can be used to wrap transactions and ensure consistency across multiple operations.
+
+4. **Lack of Traditional Transactions**: Highlights that Cassandra does not support traditional transactions where multiple writes can be started and then decided whether to commit the changes or not. This is a key difference between Cassandra and traditional relational databases like Oracle.
+
+#### 10.2.3. Availability
+
+1. **High Availability in Cassandra**: Every node is a peer, and there is no primary node. This design makes Cassandra highly available as there is no single point of failure.
+
+2. **Consistency Level and Availability**: The availability of a Cassandra cluster can be increased by reducing the consistency level of the requests. The formula `( R + W ) > N` is used to govern availability, where `W` is the minimum number of nodes where the write must be successfully written, `R` is the minimum number of nodes that must respond successfully to a read, and `N` is the number of nodes participating in the replication of data.
+
+3. **Tuning Availability**: Describes how to tune availability in Cassandra by changing the `R` and `W` values for a fixed value of `N`. For example, in a 10-node Cassandra cluster with a replication factor set to 3 (`N = 3`), if we set `R = 2` and `W = 2`, then we have `(2 + 2) > 3`. In this scenario, when one node goes down, availability is not affected much, as the data can be retrieved from the other two nodes.
+
+4. **Setting Up Keyspaces and Read/Write Operations**: Highlights the importance of setting up your keyspaces and read/write operations based on your needs—whether you need higher availability for write or higher availability for read.
+
+#### 10.2.4. Query Features
+
+1. **Data Modeling**: Since Cassandra does not have a rich query language, the design of columns and column families should be tailored to the read patterns of the application.
+
+2. **Column Sorting**: Data in each row is sorted by column names. This feature can be leveraged to improve read performance by carefully choosing the column names.
+
+3. **Row Key Selection**: Highlights the importance of selecting the right row key. If a particular column is retrieved more often than others, it can be beneficial to use that column's value as the row key. This can significantly improve the performance of read operations.
+
+    ```mermaid
+    graph LR
+        A[Row Key] --> B[Column 1]
+        A --> C[Column 2]
+        A --> D[Column 3]
+    ```
+
+4. **Performance Considerations**: The choice of row keys and the arrangement of columns can have a significant impact on the performance of the database.
+
+##### 10.2.4.1. Basic Queries
+
+1. **Cassandra Query Basics**: Discusses the basic operations in Cassandra, including `GET`, `SET`, and `DEL`. Before performing these operations, the keyspace must be specified using the `use` command.
+
+2. **Column Family Creation**: The `CREATE COLUMN FAMILY` command is used, followed by the column family name and the column definitions.
+
+    ```cql
+    CREATE COLUMN FAMILY User
+    WITH comparator = UTF8Type
+    AND key_validation_class=UTF8Type
+    AND column_metadata = [
+    {column_name: city, validation_class: UTF8Type},
+    {column_name: name, validation_class: UTF8Type},
+    {column_name: web, validation_class: UTF8Type}];
+    ```
+
+3. **Data Insertion (`SET`)**: The command is followed by the column family name, the row key, and the column name and value.
+
+    ```cql
+    SET User['jdoe']['city']='New York';
+    SET User['jdoe']['name']='John Doe';
+    SET User['jdoe']['web']='www.johndoe.com';
+    ```
+
+4. **Data Retrieval (`GET`)**: The command can be used to retrieve all columns for a row key or a specific column for a row key.
+
+    ```cql
+    GET User['jdoe'];
+    GET User['jdoe']['web'];
+    ```
+
+5. **Data Deletion (`DEL`)**: The command can be used to delete a column or an entire row.
+
+    ```cql
+    DEL User['jdoe']['city'];
+    DEL User['jdoe'];
+    ```
+
+##### 10.2.4.2. AdvancedQueries andIndexing
+
+1. **Indexing**: It is possible to index columns other than the keys in Cassandra. This feature allows for more efficient querying of data based on non-key columns.
+
+2. **Index Creation**: The `UPDATE COLUMN FAMILY` command is used, followed by the column family name and the column metadata, which includes the column name, validation class, and index type.
+
+    ```cql
+    UPDATE COLUMN FAMILY Customer
+    WITH comparator = UTF8Type
+    AND column_metadata = [{column_name: city,
+    validation_class: UTF8Type, index_type: KEYS}];
+    ```
+
+3. **Querying Indexed Columns**: Describes how to query data using the indexed column. The `GET` command is used, followed by the column family name and the condition based on the indexed column.
+
+    ```cql
+    GET Customer WHERE city = 'Boston';
+    ```
+
+4. **Index Implementation**: Highlights that indexes in Cassandra are implemented as bit-mapped indexes. These indexes perform well for columns with low cardinality values.
+
+##### 10.2.4.3. Cassandra Query Language (CQL)
+
+1. **Cassandra Query Language (CQL)**: CQL is used to interact with Cassandra and perform operations like creating column families, inserting data, and querying data.
+
+2. **Creating Column Families**: The `CREATE COLUMNFAMILY` command is used, followed by the column family name and the column definitions.
+
+    ```cql
+    CREATE COLUMNFAMILY Customer (
+        KEY varchar PRIMARY KEY,
+        name varchar,
+        city varchar,
+        web varchar
+    );
+    ```
+
+3. **Inserting Data**: The `INSERT INTO` command is used, followed by the column family name, the column names, and the values.
+
+    ```cql
+    INSERT INTO Customer (KEY,name,city,web)
+    VALUES (
+        'mfowler',
+        'Martin Fowler',
+        'Boston',
+        'www.martinfowler.com'
+    );
+    ```
+
+4. **Querying Data**: The `SELECT` command is used to retrieve all columns or specific columns from a column family.
+
+    ```cql
+    SELECT * FROM Customer;
+    SELECT name,web FROM Customer;
+    ```
+
+5. **Indexing and Querying Indexed Columns**: The `CREATE INDEX` command is used to create an index, and the `SELECT` command is used to query data based on the indexed column.
+
+    ```cql
+    SELECT name,web FROM Customer WHERE city='Boston';
+    ```
+
+6. **Limitations of CQL**: Emphasizes that while CQL has many features for querying data, it does not support all SQL features. For example, CQL does not support joins or subqueries, and its `where` clauses are typically simple.
+
+#### 10.2.5. Scaling
+
+1. **Horizontal Scaling**: It's done by adding more nodes to the cluster. This increases the capacity of the cluster to handle more read and write operations.
+
+2. **No Primary Node**: This means that every node in the cluster is a peer, which contributes to the high availability of the system.
+
+3. **Adding Nodes to the Cluster**:  When new nodes are added, the cluster continues to serve client requests, ensuring maximum uptime.
+
+4. **Improved Capacity**: Add more nodes to the cluster improves its capacity to support more reads and writes. This is a key advantage of horizontal scaling in Cassandra.
+
+### 10.3. Suitable Use Cases
+
+1. **Large Amounts of Data**: Column-family stores are well-suited to storing large amounts of data, as they are designed to scale horizontally.
+
+2. **High Write Throughput**: Column-family stores are well-suited to applications that require high write throughput, as they are designed to handle a large number of write operations.
+
+3. **Time Series Data**: Column-family stores are well-suited to storing time series data, as they are designed to handle data that is written and read in a sequential manner.
+
+- Examples: time series data, sensor data, and log data.
+
+### 10.4. When Not to Use
+
+1. **Complex Queries and Data Relationships**: Column-family stores are not well-suited to applications that require complex queries or data relationships, as they are designed to handle data that is stored in a denormalized format and support simple queries.
+
+3. **ACID Transactions**: Column-family stores are not well-suited to applications that require ACID transactions, as they are designed to handle data that is eventually consistent.
+
+4. **Data Aggregation**: Column-family stores are not well-suited to applications that require data aggregation, as they are designed to handle data that is stored in a denormalized format.
