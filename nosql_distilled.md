@@ -2355,7 +2355,7 @@ column (same for all rows) | column (can be different per row)
     DEL User['jdoe'];
     ```
 
-##### 10.2.4.2. AdvancedQueries andIndexing
+##### 10.2.4.2. AdvancedQueries and Indexing
 
 1. **Indexing**: It is possible to index columns other than the keys in Cassandra. This feature allows for more efficient querying of data based on non-key columns.
 
@@ -2445,3 +2445,216 @@ column (same for all rows) | column (can be different per row)
 3. **ACID Transactions**: Column-family stores are not well-suited to applications that require ACID transactions, as they are designed to handle data that is eventually consistent.
 
 4. **Data Aggregation**: Column-family stores are not well-suited to applications that require data aggregation, as they are designed to handle data that is stored in a denormalized format.
+
+## Chapter 11. Graph Databases
+
+Graph databases allow you to store entities and relationships between these entities. Entities are also known as nodes, which have properties. Think of a node as an instance of an object in the application. Relations are known as edges that can have properties. Edges have directional significance; nodes are organized by relationships which allow you to find interesting patterns between the nodes. The organization of the graph lets the data to be stored once and then interpreted in different ways based on relationships.
+
+1. **Understanding**: Graph databases are a type of NoSQL database that store data in the form of nodes and edges. Nodes represent entities instances, and edges represent relationships between entities.
+
+2. **Data Interpretation**: The organization of the graph allows the data to be stored once and then interpreted in different ways based on relationships.
+
+### 11.1. What Is a Graph Database?
+
+1. **Graph Structure**: Nodes represent entities and have properties, while edges represent relationships between nodes and can also have properties.
+
+    ```mermaid
+    ---
+    title: An example graph structure with nodes and edges, both with properties
+    ---
+    graph LR
+        A[Martin] ---|Friend| B[Pramod]
+        A ---|Likes| C[NoSQL Distilled]
+        D[Dawn] ---|Likes| C
+        E[Big Co] ---|Employer| A
+        E ---|Employer| B
+    ```
+
+2. **Directional Relationships**: Relationships in a graph database have directional significance. For example, if `Dawn` likes `NoSQL Distilled`, it does not mean that `NoSQL Distilled` likes `Dawn`.
+
+3. **Graph Traversal**: Explains that once a graph is created, it can be queried or traversed in many ways. For example, you can find all nodes that like `NoSQL Distilled` or all nodes employed by `Big Co` that like `NoSQL Distilled`.
+
+4. **Advantages of Graph Databases**: Graph databases are well-suited to storing data that has complex relationships, as they allow for efficient storage and retrieval of data based on these relationships. Futhermore, they have a flexible schema, which allows for the addition of new relationships or changes to the traversal requirements without changing the existing data or the database model.
+
+5. **Performance of Graph Databases**: Graph databases are fast at traversing relationships because these relationships are persisted and not calculated at query time.
+
+6. **Multiple Relationship Types**: Highlights that nodes in a graph database can have multiple types of relationships with other nodes. This allows for a flexible representation of data and supports various use cases like category, path, time-trees, quad-trees for spatial indexing, or linked lists for sorted access.
+
+### 11.2. Features
+
+1. **Graph Databases Examples**:
+    - **[Neo4J](https://neo4j.com/)**
+    - **[Infinite Graph](https://infinitegraph.com)**
+    - **[OrientDB](https://orientdb.org/)**
+    - **[FlockDB](https://en.wikipedia.org/wiki/FlockDB)** (Twitter's graph database, which only supports single-depth relationships)
+
+2. **Creating Nodes in Neo4J**: Creating two nodes named `Martin` and `Pramod`:
+
+    ```java
+    Node martin = graphDb.createNode();
+    martin.setProperty("name", "Martin");
+    Node pramod = graphDb.createNode();
+    pramod.setProperty("name", "Pramod");
+    ```
+
+3. **Creating Relationships in Neo4J**: Creating a `FRIEND` relationship between `Martin` and `Pramod`:
+
+    ```java
+    martin.createRelationshipTo(pramod, FRIEND);
+    pramod.createRelationshipTo(martin, FRIEND);
+    ```
+
+4. **Directionality of Relationships**: For example, a `user` can `like` a `product`, but a `product` cannot `like` a `user`.
+
+5. **Properties of Relationships**: These properties can add intelligence to the relationship, such as when two nodes became friends or what is the distance between them.
+
+6. **Modifying Relationships**: Emphasizes that adding new relationship types is easy, but changing existing nodes and their relationships requires data migration. This is because these changes have to be done on each node and each relationship in the existing data.
+
+#### 11.2.1. Consistency
+
+1. **Distribution of Nodes**: Most graph databases do not support distributing nodes across multiple servers due to the nature of their operations on connected nodes. However, some solutions like Infinite Graph do support this feature.
+
+2. **Data Consistency**: Within a single server, data in graph databases is always consistent. Neo4J, for instance, is fully ACID-compliant, ensuring data integrity.
+
+3. **Cluster Operations**: In a clustered setup, a write operation to the primary node is eventually synchronized to the secondary nodes. Secondary nodes are always available for read operations. Write operations to secondary nodes are immediately synchronized to the primary node, but other secondary nodes have to wait for the data to propagate from the primary node.
+
+4. **Transactions and Consistency**: Graph databases ensure consistency through transactions. They do not allow dangling relationships, meaning the start and end nodes always have to exist. Nodes can only be deleted if they don’t have any relationships attached to them.
+
+#### 11.2.2. Transactions
+
+1. **ACID Compliance**: Graph databases, like Neo4J, are ACID-compliant. This means that they support transactions and ensure data consistency, atomicity, isolation, and durability.
+
+2. **Transactions in Neo4J**: Any operation that changes nodes or adds relationships must be wrapped in a transaction. If not, a `NotInTransactionException` will be thrown. However, read operations do not require a transaction.
+
+3. **Transaction Example**: In this example, a transaction is started, a node is created and properties are set on it, the transaction is marked as successful, and finally, the transaction is finished.
+
+    - **Transaction Management**: In Neo4J, a transaction must be marked as successful, otherwise it is assumed to be a failure and is rolled back when `finish` is issued. Also, setting `success` without issuing `finish` does not commit the data to the database. This way of managing transactions is different from the standard way of doing transactions in a relational database management system (RDBMS).
+
+    ```java
+    Transaction transaction = database.beginTx();
+    try {
+        Node node = database.createNode(); 
+        node.setProperty("name", "NoSQL Distilled"); 
+        node.setProperty("published", "2012"); 
+        transaction.success();
+    } finally {
+        transaction.finish();
+    }
+    ```
+
+#### 11.2.3. Availability
+
+1. **High Availability**: Certain graph databases, like Neo4J, achieve high availability through replication. Secondary nodes can handle write operations, which are first synchronized with the primary node and then committed on both the primary and secondary nodes. Other secondary nodes will eventually receive the update.
+
+2. **Distributed Storage**: Some graph databases, such as Infinite Graph and FlockDB, support distributed storage of nodes. This means that the nodes of the graph can be stored across multiple servers.
+
+3. **Transaction Management with Apache ZooKeeper**: Neo4J uses Apache ZooKeeper to keep track of the last transaction IDs persisted on each secondary node and the current primary node. When a server starts up, it communicates with ZooKeeper to find out which server is the primary.
+
+4. **Primary Node Election**: If a server is the first one to join the cluster, it becomes the primary. If the primary goes down, the cluster elects a new primary from the available nodes, thus ensuring high availability.
+
+#### 11.2.4. Query Features
+
+1. **Graph Databases and Query Languages**: Graph databases like Neo4J support query languages such as Gremlin and Cypher. These languages allow for traversing and querying the graph, as well as querying properties of nodes and relationships.
+
+2. **Node Indexing and Searching**: Nodes and their properties can be indexed for efficient searching. For example, nodes can be indexed by name, and then searched using this indexed property.
+
+    ```java
+    Index<Node> nodeIndex = graphDb.index().forNodes("nodes");
+    Node node = nodeIndex.get("name", "Barbara").getSingle();
+    ```
+
+3. **Relationships and Directionality**: Relationships between nodes can be queried, and directionality (incoming or outgoing) can be specified. This is useful for finding related nodes or traversing the graph.
+
+    ```java
+    incomingRelations = martin.getRelationships(Direction.INCOMING);
+    outgoingRelations = martin.getRelationships(Direction.OUTGOING);
+    ```
+
+4. **Traversal and Depth**: Graph databases excel at deep traversal, allowing for exploration of nodes related to a starting node at any depth. This is achieved using a `Traverser`.
+
+    ```java
+    Node barbara = nodeIndex.get("name", "Barbara").getSingle();
+    Traverser friendsTraverser = barbara.traverse(
+        Order.BREADTH_FIRST,
+        StopEvaluator.END_OF_GRAPH,
+        ReturnableEvaluator.ALL_BUT_START_NODE,
+        EdgeType.FRIEND,
+        Direction.OUTGOING,
+    );
+    ```
+
+5. **Path Finding**: Graph databases can find paths between two nodes, including multiple paths and the shortest path. This is useful in social networks to show relationships between nodes.
+
+    ```java
+    Node barbara = nodeIndex.get("name", "Barbara").getSingle(); 
+    Node jill = nodeIndex.get("name", "Jill").getSingle(); 
+    PathFinder<Path> finder = GraphAlgoFactory.allPaths(
+        Traversal.expanderForTypes(
+            FRIEND,Direction.OUTGOING
+        ),
+        MAX_DEPTH,
+    );
+    Iterable<Path> paths = finder.findAllPaths(barbara, jill);
+    ```
+
+6. **Cypher Query Language**: Neo4J provides the Cypher query language, which allows for complex queries on the graph. Cypher queries can start from a specific node, match patterns in relationships, filter properties, and return specific nodes, relationships, or fields.
+
+    ```cypher
+    START barbara = node:nodeIndex(name = "Barbara")
+    MATCH (barbara)--(connected_node)
+    RETURN connected_node
+    ```
+
+7. **Relationship Type Query**: Cypher can also query for specific relationship types and return required fields or nodes. This is useful for querying relationships at greater depths and filtering on relationship properties.
+
+    ```cypher
+    START barbara=node:nodeIndex(name = "Barbara")
+    MATCH path = barbara-[:FRIEND*1..3]->end_node
+    RETURN barbara.name,end_node.name, length(path)
+    ```
+
+#### 11.2.5. Scaling
+
+1. **Scaling Graph Databases**: Sharding, a common scaling technique in NoSQL databases, is difficult to implement in graph databases because related nodes need to be stored on the same server for efficient graph traversal.
+
+2. **Scaling Techniques**:
+
+    - **Increasing RAM**: If the dataset can fit into memory, adding more RAM to the server can improve performance. This is useful when the dataset is small enough to fit into a single machine's RAM.
+    
+    - **Adding Secondary Nodes**: To improve read scaling, secondary nodes with read-only access can be added. All write operations are directed to the primary node. This technique is useful when the dataset is too large to fit into a single machine's RAM but small enough to be replicated across multiple machines.
+    
+    - **Application-Level Sharding**: When the dataset is too large for replication, data can be sharded at the application level using **domain-specific knowledge**. For example, nodes related to different geographical regions can be stored on different servers. This requires understanding that nodes are stored on physically different databases.
+
+3. **Citation - Jim Webber on Neo4J Scaling**: Jim Webber discusses various techniques for scaling graph databases, acknowledging the challenges due to their relationship-oriented nature.
+
+#### 11.3. Suitable Use Cases
+
+1. **Complex Relationships**: Graph databases are well-suited to storing data that has complex relationships, as they allow for efficient storage and retrieval of data based on these relationships.
+
+    - **Social Networks**: Graph databases are particularly effective in social networks, where relationships between entities are key. These relationships can span across different domains, such as social, spatial, and commerce, providing valuable cross-domain traversal.
+    - **Routing and Location-Based Services**: Graph databases can be used to model physical locations as nodes, with relationships representing distances between these locations. This can be used for efficient routing and dispatch in delivery services, or to provide location-based recommendations in applications.
+
+        ```mermaid
+        graph LR
+            A[Location 1] ---|Distance| B[Location 2]
+            B ---|Distance| C[Location 3]
+            C ---|Distance| A
+        ```
+
+    - **Recommendation Engines**: Graph databases can be used to build recommendation engines. As more nodes and relationships are added to the database, the potential for making recommendations increases. This can be used for product recommendations, travel suggestions, and more. Additionally, the same data can be used to detect patterns and anomalies, such as items that are always bought together, or potential fraud in transactions.
+
+        ```mermaid
+        graph LR
+            A[User] ---|Bought| B[Product 1]
+            A ---|Bought| C[Product 2]
+            D[User 2] ---|Bought| B
+            D ---|Bought| C
+        ```
+
+### 11.4. When Not to Use
+
+1. **Limitations**: Graph Databases may not be the best choice when you need to update a large number of entities simultaneously, such as in an analytics solution where a property change needs to be propagated across all nodes.
+
+2. **Bulk Updates**: In a graph database, changing a property on all nodes is not a straightforward operation. This is because graph databases are optimized for traversing relationships between nodes, not for bulk operations on a large number of nodes.
+
+3. **Handling Large Data Volumes**: Some graph databases may struggle with handling large volumes of data, especially in operations that involve the entire graph. This is because graph databases are optimized for localized operations on a subset of the graph, not for global operations on the entire graph.
