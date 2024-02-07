@@ -2658,3 +2658,214 @@ Graph databases allow you to store entities and relationships between these enti
 2. **Bulk Updates**: In a graph database, changing a property on all nodes is not a straightforward operation. This is because graph databases are optimized for traversing relationships between nodes, not for bulk operations on a large number of nodes.
 
 3. **Handling Large Data Volumes**: Some graph databases may struggle with handling large volumes of data, especially in operations that involve the entire graph. This is because graph databases are optimized for localized operations on a subset of the graph, not for global operations on the entire graph.
+
+## Chapter 12. Schema Migrations
+
+### 12.1. Schema Changes
+
+1. **Schemaless Nature**: NoSQL databases are often described as schemaless, meaning that they do not require a predefined schema. This allows for flexibility in the data being stored, as new fields can be added without changing the existing data or the database model. This is particularly beneficial in agile development environments where requirements can change frequently.
+
+2. **Importance of Domain Understanding**: Emphasizes the importance of discussions, iterations, and feedback loops with domain experts and product owners to gain a correct understanding of the data. The complexity of a database's schema should not hinder these discussions.
+
+3. **Schema Migration**: Even though NoSQL databases are schemaless, careful attention must be given to schema migration when developing and maintaining an application. This is because changes in the way data is structured or related can still impact how the data is accessed and processed by the application.
+
+### 12.2. Schema Changes in RDBMS
+
+1. **Object-Relational Mapping**: Discusses the process of mapping objects in an application to tables in a relational database. For example, in an e-commerce system, `Customer`, `Order`, and `OrderItems` objects might correspond to tables in the database.
+
+    ```mermaid
+    ---
+    title: Data model of an e-commerce system
+    ---
+    graph LR
+        A[Customer] -->|1| B[Order]
+        B -->|1| C[OrderItems]
+    ```
+
+2. **Schema Changes**: Changes to the object model, such as adding a `preferredShippingType` property to the `Customer` object, require corresponding changes to the database schema. If the schema is not updated, the application and database become out of sync, leading to errors.
+
+3. **Database Migration**: The challenges of database migration involves creating scripts to apply changes from the development database to the production database. This process can be error-prone and does not align well with agile development methods, which favor frequent, incremental changes.
+
+#### 12.2.1. Migrations for Green Field Projects
+
+1. **Database Migration Scripts**: These scripts are stored in a version-controlled directory, with each script named sequentially to reflect the order of changes.
+
+    ```plaintext
+    migrations
+    ├── 001_Create_Customer_Table.sql
+    ├── 002_Add_Phone_Number_To_Customer.sql
+    ├── 003_Add_Address_To_Customer.sql
+    ├── 004_Add_Payment_Method_To_Customer.sql
+    ├── 005_Add_Payment_Method_To_Order.sql
+    ├── 006_Add_Product_Table.sql
+    ├── 007_Add_Product_Review.sql
+    ├── 008_Add_Product_Review_Comment.sql
+    ├── 009_Add_DiscountedPrice_To_OrderItem.sql
+    ```
+
+2. **Schema Changes and Data Migration**: A change script includes both schema changes and data migration. For example, adding a `DiscountedPrice` column to the `OrderItem` table involves adding the new column, updating its values, and renaming the existing `Price` column.
+
+    ```sql
+    ALTER TABLE orderitem ADD discountedprice NUMBER(18,2) NULL;
+    UPDATE orderitem SET discountedprice = price;
+    ALTER TABLE orderitem MODIFY discountedprice NOT NULL;
+    ALTER TABLE orderitem RENAME COLUMN price TO fullprice;
+    ```
+
+3. **Database Versioning with DBDeploy**: DBDeploy can be used to manage database changes. DBDeploy maintains a `ChangeLog` table in the database, which records all changes made. The `Change_Number` in this table corresponds to the script number in the migrations folder. DBDeploy uses this number to apply any unapplied changes.
+
+4. **Version Control for Database Changes**: It's recommended to store database change scripts in the project's version control repository. This allows for tracking the versions of both the software and the database, preventing mismatches between the two. It also allows for easy rollback of changes if necessary.
+
+#### 12.2.2. Migrations in Legacy Projects
+
+1. **Database Migrations in Existing Projects**: The process of implementing database migrations in an existing project involves creating a baseline of the current database structure, code, and reference data, which serves as a starting point for further changes.
+
+    ```plaintext
+    baseline
+        ├── last_release_code.sql
+        ├── last_release_data.sql
+        ├── last_release_schema.sql
+    ```
+
+2. **Backward Compatibility**: Emphasizes the importance of maintaining backward compatibility when changing the database schema. This is particularly important in environments where multiple applications use the same database. A transition phase can be used to ensure that changes to the database do not break other applications.
+
+    ```sql
+    ALTER TABLE customer ADD fullname VARCHAR2(60); 
+    UPDATE customer SET fullname = fname;
+    CREATE OR REPLACE TRIGGER SyncCustomerFullName BEFORE INSERT OR UPDATE
+    ON customer
+    REFERENCING OLD AS OLD NEW AS NEW
+    FOR EACH ROW BEGIN
+    IF :NEW.fname IS NULL THEN :NEW.fname := :NEW.fullname;
+    END IF;
+    IF :NEW.fullname IS NULL THEN
+    :NEW.fullname := :NEW.fname END IF;
+    END; /
+    ```
+
+    - **Column Renaming Example**: In this example, a new column is added, data is copied over, and a trigger is used to synchronize data between the old and new columns. The old column and trigger can be dropped once all applications have started using the new column.
+
+3. **Challenges of Schema Migrations on Large Datasets**: Large data movements and structural changes can create locks on the database tables, which can disrupt the availability of the database to applications.
+
+### 12.3. Schema Changes in a NoSQL Data Store
+
+1. **Schemaless Approach**: NoSQL databases are often described as schemaless, meaning that they do not require a predefined schema. Unlike RDBMS, where the database schema must be updated before the application, NoSQL databases allow for changes to be made at the entity level, making them more adaptable to frequent market changes and product innovations.
+
+2. **Schema Considerations**: While NoSQL databases do not require a predefined schema, other aspects such as relationship types, column families, row and column names, key assignments, and data structure within value objects must still be considered. These decisions can be changed easily if needed.
+
+3. **Misconception of Schemaless Databases**: Clarifies that while NoSQL databases store data without regard to its schema, the application must still define the schema to parse the data stream when reading from the database. Therefore, even in schemaless databases, schema changes must be considered when refactoring the application.
+
+4. **Schema Changes in Production**: It's important to consider schema changes when there is a deployed application and existing production data. In the following example, a new attribute (`preferredShippingType`) is added to the document. The application code must ensure that documents without this new attribute can still be parsed.
+
+    ```json
+    {
+        "_id": "4BD8AE97C47016442AF4A580",
+        "customerid": 99999,
+        "name": "Foo Sushi Inc",
+        "since": "12/12/2012",
+        "order": {
+            "orderid": "4821-UXWE-122012",
+            "orderdate": "12/12/2001",
+            "orderItems": [
+                {
+                    "product": "Fortune Cookies",
+                    "price": 19.99
+                }
+            ]
+        }
+    }
+    ```
+
+5. **Schema Changes and Data Compatibility**: It's a big challenge to maintain data compatibility when making schema changes. In the following example, the `price` attribute is renamed to `fullPrice`, and a new `discountedPrice` attribute is added. New data can be saved and read without problems, but existing data may cause issues because the application code is looking for the new attribute names.
+
+    ```json
+    {
+        "_id": "5BD8AE97C47016442AF4A580",
+        "customerid": 66778,
+        "name": "India House",
+        "since": "12/12/2012",
+        "order": {
+            "orderid": "4821-UXWE-222012",
+            "orderdate": "12/12/2001",
+            "orderItems": [
+                {
+                    "product": "Chair Covers",
+                    "fullPrice": 29.99,
+                    "discountedPrice": 26.99
+                }
+            ]
+        }
+    }
+    ```
+
+#### 12.3.1. Incremental Migration
+
+Schema mismatch trips many new converts to the NoSQL world. When schema is changed on the application, we have to make sure to convert all the existing data to the new schema (depending on data size, this might be an expensive operation). Another option would be to make sure that data, before the schema changed, can still be parsed by the new code, and when it’s saved, it is saved back in the new schema. This technique, known as incremental migration, will migrate data over time; some data may never get migrated, because it was never accessed. We are reading both `price` and `fullPrice` from the document:
+
+```java
+BasicDBObject item = (BasicDBObject) orderItem; String productName = item.getString("product"); Double fullPrice = item.getDouble("price");
+if (fullPrice == null) {
+fullPrice = item.getDouble("fullPrice"); }
+Double discountedPrice = item.getDouble("discountedPrice");
+```
+
+When writing the document back, the old attribute `price` is not saved:
+
+```java
+BasicDBObject orderItem = new BasicDBObject(); orderItem.put("product", productName); orderItem.put("fullPrice", price); orderItem.put("discountedPrice", discountedPrice); orderItems.add(orderItem);
+```
+
+When using incremental migration, there could be many versions of the object on the application side that can translate the old schema to the new schema; while saving the object back, it is saved using the new object. This gradual migration of the data helps the application evolve faster.
+
+The incremental migration technique will complicate the object design, especially as new changes are being introduced yet old changes are not being taken out. This period between the change deployment and the last object in the database migrating to the new schema is known as the transition period (Figure 12.6). Keep it as short as possible and focus it to the minimum possible scope—this will help you keep your objects clean.
+
+Figure 12.6. Transition period of schema changes
+
+The incremental migration technique can also be implemented with a `schema_version` field on the data, used by the application to choose the correct code to parse the data into the objects. When saving, the data is migrated to the latest version and the `schema_version` is updated to reflect that.
+
+Having a proper translation layer between your domain and the database is important so that, as the schema changes, managing multiple versions of the schema is restricted to the translation layer and does not leak into the whole application.
+
+Mobile apps create special requirements. Since we cannot enforce the latest upgrades of the application, the application should be able to handle almost all versions of the schema.
+
+#### 12.3.2. Migrations in Graph Databases
+
+1. **Edge Types**: Changing the type of an edge can disrupt the ability to traverse the database. To mitigate this, one can traverse all edges and change their types, although this can be a costly operation.
+
+2. **Maintaining Backward Compatibility**: Another approach is to maintain backward compatibility by creating new edges between nodes while maintaining the old ones. Once the new system has been fully adopted, the old edges can be dropped. This approach can be beneficial for large databases where high availability is crucial.
+
+3. **Changing Node Properties**: This involves fetching all nodes and updating the necessary properties. For example, adding tracking properties to all nodes.
+
+    ```java
+    for (Node node : database.getAllNodes()) {
+        node.setProperty("NodeCreatedBy", getSystemUser());
+        node.setProperty("NodeCreatedOn", getSystemTimeStamp());
+    }
+    ```
+
+#### 12.3.3. Changing Aggregate Structure
+
+1. **Schema Design Changes**: Discusses the process of changing the schema design in NoSQL databases. This can involve splitting large objects into smaller ones that are stored independently. For example, a customer object containing all orders can be split into separate customer and order objects.
+
+2. **Code Compatibility with Schema Changes**: Highlights the need for application code to be compatible with both the old and new versions of the schema. If the application does not find the old objects, it should look for the new ones.
+
+3. **Data Migration for Schema Changes**: This can be done by reading one object at a time, making the necessary changes, and saving the data back into different objects. This approach ensures data availability for the application during the migration process.
+
+    ```mermaid
+    graph LR
+        A[Customer with Orders] -->|Split| B[Customer]
+        A -->|Split| C[Order]
+    ```
+
+### 12.4. Further Reading
+
+1. **Citation - Ambler and Sadalage**: They Have written extensively on the topic of database migrations. Their work, while focused on relational databases, provides valuable insights that can be applied to other types of databases as well.
+
+### 12.5. Key Points
+
+- Databases with strong schemas, such as relational databases, can be migrated by saving each schema change, plus its data migration, in a version-controlled sequence.
+
+- Schemaless databases still need careful migration due to the implicit schema in any code that accesses the data.
+
+- Schemaless databases can use the same migration techniques as databases with strong schemas.
+
+- Schemaless databases can also read data in a way that’s tolerant to changes in the data’s implicit schema and use incremental migration to update data.
