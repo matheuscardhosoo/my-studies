@@ -2869,3 +2869,140 @@ Mobile apps create special requirements. Since we cannot enforce the latest upgr
 - Schemaless databases can use the same migration techniques as databases with strong schemas.
 
 - Schemaless databases can also read data in a way that’s tolerant to changes in the data’s implicit schema and use incremental migration to update data.
+
+## Chapter 13. Polyglot Persistence
+
+1. **Database Selection Based on Requirements**: It's important to choose the right database for the specific requirements of the system. Using a single database for all requirements can lead to performance issues. Different databases are optimized for different tasks, such as transactional data storage, caching session information, or graph traversal.
+
+2. **Relational Databases and Data Relationships**: While relational databases are good at enforcing data relationships, discovering new relationships or aggregating data from different tables can be challenging.
+
+3. **Database Engine Design**: Database engines are designed to perform certain operations efficiently. Some are optimized for set operations, others for fast key-value storage and retrieval, and others for storing rich documents or complex graphs of information.
+
+### 13.1. Disparate Data Storage Needs
+
+1. **Different Data Storage Needs**: Different parts of an application have different data storage needs. For example, business transactions require ACID transactions, session management requires fast read and write operations, and reporting requires complex queries. Each of these areas may have different requirements for availability, consistency, and backup strategies.
+
+2. **Polyglot Programming**: This concept suggests using different programming languages for different parts of an application to take advantage of the strengths of each language. This concept can also be applied to data storage, using different types of databases for different data storage needs.
+
+3. **Polyglot Persistence**: Expands on the concept of polyglot programming to include data persistence. This approach involves using different types of databases for different data storage needs within the same application. For example, a highly available and scalable data store might be used for a shopping cart, while a different data store that supports complex queries might be used for product recommendations.
+
+4. **Citation - Neal Ford**: Cites Neal Ford as the originator of the term "polyglot programming" in 2006. This concept has since been expanded to include data persistence, leading to the term "polyglot persistence".
+
+### 13.2. Polyglot Data Store Usage
+
+1. **Polyglot Persistence in E-commerce**: Discusses the application of polyglot persistence in an e-commerce context. Different types of data stores are used for different purposes, demonstrating the benefits of using the right tool for the job.
+
+    ```mermaid
+    graph LR
+        A[Shopping Cart & Session Data] -->|Stored in| B[Key-Value Store]
+        C[Confirmed Orders] -->|Stored in| D[RDBMS]
+        E[Product Recommendations] -->|Stored in| F[Graph Database]
+    ```
+
+2. **Key-Value Stores for Transient Data**: Highlights the use of a key-value data store for transient data, such as shopping cart and session data. These types of data are often accessed by a specific key (like user ID or session ID) and do not require complex queries.
+
+3. **Relational Databases for Confirmed Orders**: Once an order is confirmed and paid by the customer, it can be saved in a relational database management system (RDBMS). This is because RDBMSs are good at enforcing data relationships and integrity, which are important for confirmed orders.
+
+4. **Graph Databases for Product Recommendations**: Suggests using a graph database for product recommendations. Graph databases are well-suited for finding relationships between entities, such as "friends who bought this product also bought these other products".
+
+5. **Specialized Relational Databases**: Mentions the use of specialized relational databases for specific purposes, such as data warehousing or analytics. Even within the realm of relational databases, different databases can be used for different tasks, demonstrating the concept of polyglot persistence.
+
+### 13.3. Service Usage over Direct Data Store Usage
+
+1. **Data Sharing Across Applications**: Other applications in the enterprise can benefit from the data stored in our data stores. For example, the graph data store used for product recommendations could also serve data to other applications that need to understand customer buying patterns.
+
+2. **Service Wrapping for Data Stores**: Wrapping the data store in a service allows for centralized data ownership and provides useful APIs for multiple applications. This approach can also help to decouple the applications from the underlying data store, making it easier to evolve the data store without changing the dependent applications.
+
+3. **Service Wrapping for All Databases**: Expands the concept of service wrapping to include all databases. This allows the application to communicate with services instead of directly with databases, which can make it easier to evolve the databases without changing the dependent applications.
+
+    ```mermaid
+    ---
+    title: Service wrapping for all databases
+    ---
+    graph TD
+        ecommerce["E-commerce Platform"]
+
+        subgraph session_service["Session Service"]
+            key_value_store(("Key-Value Store"))
+        end
+
+        subgraph order_service["Order Service"]
+            document_store(("Document Store"))
+        end
+
+        subgraph stock_service["Stock Service"]
+            rdbms(("RDBMS"))
+        end
+
+        subgraph recommendation_service["Recommendation Service"]
+            graph_db(("Graph Database"))
+        end
+
+        ecommerce --> session_service
+        ecommerce --> order_service
+        ecommerce --> stock_service
+        ecommerce --> recommendation_service
+    ```
+
+4. **NoSQL Data Stores with REST APIs**: Notes that many NoSQL data store products, such as Riak and Neo4J, provide out-of-the-box REST APIs, which can facilitate the service wrapping approach.
+
+### 13.4. Expanding for Better Functionality
+
+1. **Enhancing Legacy Storage with Supplemental Storage**: Sometimes, it's not feasible to change the data storage type used by legacy applications. In such cases, supplemental storage, such as caching or indexing engines, can be used to enhance the performance of the existing data storage.
+
+    ```mermaid
+    graph LR
+        A[Legacy Storage] --> B[Application]
+        A -->|Supplement with| C[Cache/Indexing Engine]
+        C --> B
+    ```
+
+2. **Data Synchronization**: The supplemental storage needs to be synchronized with the application's data storage. This can be done in real-time or in batches, depending on the application's tolerance for stale data.
+
+3. **Event Sourcing for Data Updates**: Event sourcing can be used to update the index or cache when data in the application database changes. This approach involves capturing all changes to an application state as a sequence of events, which can then be used to reconstruct the past application state.
+
+    ```mermaid
+    graph LR
+        A[Application Database] -->|Event Sourcing| B[Event Store]
+        B -->|Event Sourcing| C[Index/Cache]
+    ```
+
+### 13.5. Choosing the Right Technology
+
+1. **Data Storage Evolution**: Data storage solutions have evolved from specialized databases to a single RDBMS, and now back to specialized databases. This shift is driven by the need to use data storage that natively supports the implementation of solutions.
+
+2. **Choosing the Right Data Storage**: It's important to choose the right data storage technology that can adapt to changing requirements without losing or reformatting existing data. For example, if we need to recommend products to customers based on their shopping cart contents and other customers' purchases, we should choose a data store that can support these queries natively.
+
+3. **RDBMS for Hierarchical Data**: It's possible to use an RDBMS to store hierarchical data and perform hierarchical queries. However, if the data relationships change, we would need to refactor the database and migrate the data.
+
+4. **Graph Databases for Flexible Relationships**: Tracking relationships between nodes is a good use case for graph databases. They can easily adapt to new relationships with minimal changes, making them a more flexible choice for data that has complex and changing relationships.
+
+### 13.6. Enterprise Concerns with Polyglot Persistence
+
+1. **Adapting to NoSQL Technologies**: Enterprise database administrators need to adapt to the use of NoSQL technologies. This includes learning how these technologies work, how to monitor them, back them up, and manage data within them.
+
+2. **Considerations for Adopting NoSQL**: There are several considerations when adopting NoSQL technologies, such as licensing, support, tools, upgrades, drivers, auditing, and security. While many NoSQL technologies are open-source and have community support, enterprises need to consider these factors.
+
+3. **Security in NoSQL Databases**: NoSQL databases often delegate security responsibilities to the application. This means that the application needs to manage user authentication, authorization, and data encryption. Enterprises need to ensure that their applications are secure when using NoSQL databases.
+
+4. **Data Integration with NoSQL**: Enterprises need to integrate NoSQL data sources with existing data warehouse, business intelligence, and analytics systems. This involves ensuring that ETL tools or other data movement mechanisms can read data from NoSQL data stores.
+
+5. **NoSQL for Analytics**: NoSQL databases are often used for analytics, particularly when dealing with large volumes of data. Enterprises need to ensure that their NoSQL databases can handle a large number of writes and scale to accommodate increasing data volumes.
+
+### 13.7. Deployment Complexity
+
+1. **Deployment Complexity in Polyglot Persistence**: Deployment complexity increases when using polyglot persistence. This is because multiple databases need to be available in all environments, including production, UAT, QA, and Dev.
+
+2. **Open-Source NoSQL Databases**: Open-source NoSQL databases are often used to reduce licensing costs. However, they require additional effort to set up, configure, and maintain, which can increase deployment complexity.
+
+3. **Minimal Configuration for NoSQL Databases**: Notes that many NoSQL databases can be started with minimal configuration due to their sensible default settings. This can further simplify the deployment process.
+
+### 13.8. Key Points
+
+- Polyglot persistence is about using different data storage technologies to handle varying data storage needs.
+
+- Polyglot persistence can apply across an enterprise or within a single application.
+
+- Encapsulating data access into services reduces the impact of data storage choices on other parts of a system.
+
+- Adding more data storage technologies increases complexity in programming and operations, so the advantages of a good data storage fit need to be weighed against this complexity.
