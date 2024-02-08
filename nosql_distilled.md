@@ -3006,3 +3006,118 @@ Mobile apps create special requirements. Since we cannot enforce the latest upgr
 - Encapsulating data access into services reduces the impact of data storage choices on other parts of a system.
 
 - Adding more data storage technologies increases complexity in programming and operations, so the advantages of a good data storage fit need to be weighed against this complexity.
+
+
+## Chapter 14. Beyond NoSQL
+
+### 14.1. File Systems
+
+1. **Beyond NoSQL**: File systems are a form of data storage that is often overlooked in discussions of NoSQL databases. However, they share some similarities with key-value stores, particularly in their use of hierarchical keys and simple locking mechanisms.
+
+2. **Advantages**:
+
+    - **Simplicity**: File systems are simple to use and understand, making them a good choice for storing unstructured data.
+
+    - **Widespread Implementation**: File systems are widely implemented and supported across different operating systems and platforms.
+
+    - **Handling Large Entities**: File systems are well-suited for handling large entities, such as video and audio files, which can be stored and retrieved efficiently.
+
+3. **Distributed File Systems**: Distributed file systems have emerged as a way to store and access large files across multiple nodes. These systems support file replication and are often used in conjunction with map-reduce operations for processing large files across multiple nodes.
+
+4. **Limitations of File Systems**:
+
+    - **Poor Performance with Small Files**: File systems can perform poorly when dealing with a large number of small files, as they are not optimized for this use case.
+
+    - **Lack of Query Support**: File systems do not support queries without additional indexing tools, making them less suitable for applications that require complex queries.
+
+### 14.2. Event Sourcing
+
+1. **Event Sourcing**: Approach to data persistence that focuses on storing changes to the application state rather than the state itself. This approach works well with various persistence technologies, including relational databases and NoSQL databases.
+
+2. **Event Sourcing Example**:
+
+    - **Ship's Location Tracking**: Instead of updating the ship's location directly, the system creates an event each time the ship's location changes and stores this event in an event log. The application state (the ship's current location) can then be derived from this event log.
+
+        ```mermaid
+        graph LR
+            A[Ship Location Change] --> B[Create Event]
+            B --> C[Store Event in Log]
+            C --> D[Update Application State]
+        ```
+
+3. **Event Log and Application State**: The application state can be entirely derived from the event log. The application state can be discarded and rebuilt from the event log at any time.
+
+4. **Snapshots for Optimization**: Snapshots can be used to optimize the recovery of the application state. While the event log is the authoritative source of data, snapshots can provide a faster way to recover the application state by storing a memory image of the state at a specific point in time.
+
+5. **Event Broadcasting**: Event sourcing can be used to broadcast events to multiple systems, each of which can build a different application state for different purposes. This approach can be particularly useful for read-intensive systems, where multiple read nodes can be provided with potentially different schemas.
+    - **CQRS**: Command Query Responsibility Segregation (CQRS) is a design pattern that separates the read and write operations of a system. Event sourcing is often used in conjunction with CQRS to provide a clear separation between the read and write sides of the system.
+
+6. **Historic Information Analysis**: Event sourcing can be an effective platform for analyzing historic information, as any past state in the event log can be replicated. Alternative scenarios can also be investigated by introducing hypothetical events into an analysis processor.
+
+7. **Complexity of Event Sourcing**: Event sourcing introduces complexity, particularly in the area of data recovery and state rebuilding. It also requires a different mindset for developers, as they need to think in terms of events and their impact on the application state.
+
+### 14.3. Memory Image
+
+1. **In-Memory Application State**: Storing the application state in memory can improve performance by eliminating disk I/O and simplifying programming by removing the need for mapping between disk and in-memory data structures.
+
+2. **Limitations**:
+
+    - **Data Durability**: In-memory data is not durable, meaning that it is lost when the application is shut down. This requires additional mechanisms to persist the data to disk for recovery.
+
+    - **Memory Size**: The size of the application state is limited by the amount of memory available, which can be a problem for large datasets.
+
+    - **Recovery Mechanism**: In-memory data needs a quick recovery mechanism in case of a system crash. This could be achieved by reloading events from the event log or running a duplicate system.
+
+    - **Concurrency**: In-memory data needs to handle concurrency, particularly in multi-threaded applications. This can be achieved through transactional memory systems or single-threaded event processors.
+
+3. **Error Handling**: Error handling in in-memory systems can be different from traditional systems. Instead of relying on automated rollback, in-memory systems may need to perform thorough validation before applying any changes or implement a custom rollback mechanism.
+
+    - **Citation - Fowler lmax**: Refers to Martin Fowler's article on the LMAX architecture, which is an example of a high-performance, single-threaded event processor. This architecture demonstrates that a single-threaded event processor can achieve high throughput and low latency when designed carefully.
+
+### 14.4. Version Control
+
+1. **Event-Sourced Systems and Version Control**: Event-sourced systems share similarities with version control systems. Both types of systems allow for the exploration of past states and alternative realities, making them useful for coordinating modifications in complex systems.
+
+2. **Limitations of Single-Point-of-Time Worldview**: Traditional data storage tools only support a single-point-of-time worldview, which can be limiting in complex scenarios. Version control systems, on the other hand, can handle complex scenarios involving historic queries and multiple views of the world.
+
+3. **Version Control Systems and File Systems**: File systems and version control systems share many of the same limitations for data storage. While they are not designed for application data storage, they can be useful in scenarios where timeline capabilities are important.
+
+4. **Potential for Version Control Concepts in Data Storage**: Data storage tools could benefit from borrowing concepts from version control systems. This could include features like support for historic queries, multiple views of the world, and the ability to explore alternative realities.
+
+### 14.5. XML Databases
+
+1. **Concept**: XML databases are a type of document database that store and manipulate data in XML format. These databases can use XML technologies to check document formats, run queries, and perform transformations.
+
+2. **XML in Relational Databases**: XML capabilities can be integrated into relational databases by storing XML documents in a column and allowing a blend of SQL and XML query languages. This approach can be useful for applications that need to store and query XML documents alongside relational data.
+
+3. **XML as a Structuring Mechanism**: XML can be used as a structuring mechanism within a key-value store. While JSON is more popular today, XML is equally capable of storing complex aggregates and offers greater schema and query capabilities.
+
+4. **Advantages**:
+
+    - **Complex Data Structures**: XML databases are well-suited for storing complex data structures, such as hierarchical data, which can be difficult to represent in a relational database.
+
+5. **Limitations**:
+
+    - **Complexity**: XML databases can be more complex to use and maintain compared to other types of databases. This complexity can be a barrier to adoption, particularly for applications that do not require the full capabilities of XML.
+
+### 14.6. Object Databases
+
+1. **Concept**: Object databases are designed to store and retrieve objects, which are instances of classes in an object-oriented programming language. These databases are well-suited for applications that use object-oriented programming languages, as they can store objects directly without the need for complex mapping.
+
+2. **Benefits**:
+
+    - **Object Persistence**: Object databases can persist objects directly, without the need for complex mapping between objects and relational tables.
+
+    - **Complex Relationships**: Object databases can store complex relationships between objects, such as inheritance and composition, which can be difficult to represent in a relational database.
+
+2. **Drawbacks**:
+
+    - **Limited Adoption**: Object databases have limited adoption compared to other types of databases, such as relational and NoSQL databases. This can make it difficult to find tools, libraries, and support for object databases.
+
+    - **Data Access**: Object databases can be difficult to access outside of the application, as they are tightly integrated with the application's object model. This can make it difficult to perform complex queries and reporting on object database data.
+
+    - **Data Migration**: Object databases can be difficult to migrate when the object model changes, as the database schema is closely tied to the application's object model. This can make it difficult to evolve the database schema over time.
+
+### 14.7. Key Points
+
+- NoSQL is just one set of data storage technologies. As they increase comfort with polyglot persistence, we should consider other data storage technologies whether or not they bear the NoSQL label.
