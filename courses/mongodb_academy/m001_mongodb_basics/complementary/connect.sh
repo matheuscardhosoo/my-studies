@@ -1,0 +1,1 @@
+mongo "mongodb+srv://financial-go-t5def.mongodb.net/test"  --username m001-student --password m001-mongodb-basics
