@@ -12,6 +12,9 @@
 - **Amazon Link**: 
   - [**English Edition**](https://www.amazon.com/NoSQL-Distilled-Emerging-Polyglot-Persistence/dp/0321826620)
   - [**Portuguese Edition**](https://www.amazon.com.br/NoSQL-Essencial-Emergente-Persist%C3%AAncia-Poliglota-ebook/dp/B07V5635ZQ)
+- **Authors' Blogs**:
+    - [Sadalage Architecture and Data Blog](https://www.sadalage.com).
+    - [Martin Fowler: Data Management Guide](https://martinfowler.com/data/index.html#nosql).
 
 ---
 
@@ -3121,3 +3124,85 @@ Mobile apps create special requirements. Since we cannot enforce the latest upgr
 ### 14.7. Key Points
 
 - NoSQL is just one set of data storage technologies. As they increase comfort with polyglot persistence, we should consider other data storage technologies whether or not they bear the NoSQL label.
+
+## Chapter 15. Choosing Your Database
+
+### 15.1. Programmer Productivity
+
+1. **Frustration with Relational Databases**: Many developers are frustrated with the impedance mismatch between the object-oriented programming model and the relational database model. This mismatch can lead to complex mapping code and performance issues. While Object-Relational Mapping (ORM) frameworks have eased this burden, they are not a perfect solution and can lead to performance issues.
+
+2. **Benefits of Aggregate-Oriented Databases**: Aggregate-oriented databases, such as document databases, can offer significant benefits in terms of programmer productivity. These databases allow developers to persist data in the same format as they use it, eliminating the need for an ORM.
+
+3. **NoSQL Databases for Nonuniform Data**: NoSQL databases are better suited for nonuniform data, offering relief from the strict schemas of relational databases. This can lead to increased programmer productivity by allowing developers to store and query data in a more natural way.
+
+    -  **Graph Databases for Relationship-Heavy Data**: Graph databases can be a good fit for relationship-heavy data, such as social networks, recommendation engines, and fraud detection systems.
+
+5. **Assessing the Fit of a Data Model**: It's important to assess the fit of a data model by examining the data usage requirements of the software's features. A good fit between the data model and the data usage can lead to easier programming.
+
+6. **Polyglot Persistence for Different Data Needs**: Polyglot persistence can be used to take advantage of the strengths of different databases for different data needs. While this approach is more complex than using a single store, it can offer overall benefits if each database is a good fit for its respective data.
+
+7. **Identifying Bad Fit Cases**: It's important to identify cases where the data model is a bad fit. These cases should be considered when assessing the overall fit of a data model.
+
+8. **Trying Out Different Databases**: It's highly recommended to try out different databases by building initial features and assessing the ease of use of each database. This can provide valuable insights into the productivity and effectiveness of different databases.
+
+9. **Assessing Productivity**: Measuring productivity can be challenging, as it's often subjective and depends on the experience and preferences of the development team. It's important to rely on the subjective judgment of the development team when assessing productivity.
+
+10. **Limitations of Assessment**: It's important to acknowledge the limitations of the assessment process, such as the inability to fully appreciate a technology without spending a significant amount of time using it. Despite these limitations, the decision should be based on as much real programming experience as possible.
+
+### 15.2. Data-Access Performance
+
+1. **NoSQL for Rapid Data Access**: NoSQL rised to prominence due to its ability to provide rapid data access. These databases were developed to run efficiently on large clusters, enabling horizontal scaling.
+
+2. **Performance Factors in NoSQL Databases**: NoSQL databases can offer better performance than relational databases due to factors such as simpler data models, easier horizontal scaling, and the ability to store data in a format that matches the application's data usage.
+
+3. **Performance Testing for NoSQL Databases**: It's important to perform performance testing to assess the performance of a NoSQL database in a relevant scenario. The only way to accurately assess performance is to build a system, run it, and measure it.
+
+    - **Building a Representative Performance Test**: Building a representative performance test can be challenging, as it requires simulating realistic loads and data volumes. It's important to test the database under conditions that it's intended to serve.
+    
+    - **Using Cloud Resources**: Cloud computing resources can be used to generate load and build a test cluster for performance testing. The elastic nature of cloud provisioning is particularly useful for performance assessment work.
+    
+    - **Choosing Scenarios**: It's important to choose scenarios that are common, performance-dependent, and potentially challenging for the database model. This can help identify risks outside of the main use cases.
+    
+    - **Estimating Test Volumes**: It's important to estimate test volumes, especially early in a project. It's important to make assumptions explicit and communicate them with all stakeholders to ensure everyone has the same understanding of the expected load.
+
+### 15.3. Sticking with the Default
+
+1. **NoSQL as a Viable Option**: NoSQL databases have become a viable option for many applications, particularly those that require rapid data access and horizontal scaling. However, it's important to acknowledge that the majority of cases may still be better served by relational databases.
+
+2. **Advantages of Relational Databases**: Relational databases have many advantages, including maturity, wide range of tools, and the availability of experienced users. Choosing a relational database can also avoid the political issues associated with adopting new technology.
+
+3. **Choosing NoSQL Over Relational Databases**: NoSQL databases should only be chosen over relational databases if there is a clear advantage. This advantage could be in terms of programmability, performance, or other factors.
+
+4. **Assessing the Need for NoSQL**: It's important to assess the need for NoSQL databases. If there's no clear advantage over relational databases, it's perfectly acceptable to stick with the relational option. While NoSQL databases can be advantageous in many cases, they are not the best choice for all or even most situations.
+
+### 15.4. Hedging Your Bets
+
+1. **Uncertainty in Choosing Data Storage**: There is often uncertainty in choosing the right data storage technology. This uncertainty can be due to the lack of experience with a particular technology, the rapid pace of change in the technology landscape, or the difficulty of predicting future requirements.
+
+2. **Encapsulating Database Choice**: Encapsulating the database choice in a section of the codebase can make it easier to replace the database if needed. This can be done using patterns like Data Mapper and Repository.
+
+    - **Data Mapper**: The Data Mapper pattern separates the in-memory objects from the database, allowing the database to be replaced without changing the application code.
+
+    - **Repository**: The Repository pattern provides a collection-like interface to access domain objects, allowing the underlying database to be replaced without changing the application code.
+
+3. **Cost of Encapsulation Layer**: It's important to acknowledge the cost of creating an encapsulation layer, especially when dealing with different data models. The lack of experience in encapsulating data layers between different types of data stores adds to this challenge.
+
+4. **Balancing Encapsulation and Database Features**: It's important to balance the cost of the encapsulation layer with the benefits of using specific database features. If the encapsulation layer is becoming a burden, it might be better to choose a database that offers the needed features.
+
+5. **Decomposing Database Layer into Services**: Decomposing the database layer into services can reduce coupling between services and make it easier to replace a database in the future.
+
+6. **Applying Design Advice to Relational Databases**: The same design advice can be applied to relational databases. By encapsulating parts of the database into services, it's possible to replace parts of the data store with a NoSQL technology as it matures and its advantages become clearer.
+
+### 15.5. Key Points
+
+- The two main reasons to use NoSQL technology are:
+
+    - To improve programmer productivity by using a database that better matches an application’s needs.
+
+    - To improve data access performance via some combination of handling larger data volumes, reducing latency, and improving throughput.
+
+- It’s essential to test your expectations about programmer productivity and/or performance before committing to using a NoSQL technology.
+
+- Service encapsulation supports changing data storage technologies as needs and technology evolve. Separating parts of applications into services also allows you to introduce NoSQL into an existing application.
+
+- Most applications, particularly nonstrategic ones, should stick with relational technology—at least until the NoSQL ecosystem becomes more mature.
