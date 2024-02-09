@@ -1,7 +1,5 @@
-# Books
+# Data Management
 
-Summary of books I've been reading
+## [Books](./books/index.md)
 
-## 2023
-
-- [ ] [NoSQL Distilled: A Brief Guide to the Emerging World of Polyglot Persistence](./nosql_distilled.md)
+- [x] [NoSQL Distilled: A Brief Guide to the Emerging World of Polyglot Persistence](./books/nosql_distilled/nosql_distilled.md)
