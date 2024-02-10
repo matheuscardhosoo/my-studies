@@ -1,10 +1,10 @@
-# [Orquestração vs Coreografia em microserviços](https://medium.com/@crisaltmann/orquestra%C3%A7%C3%A3o-vs-coreografia-em-eda-8c14db455892)
+# [Orquestração vs Coreografia em microsserviços](https://medium.com/@crisaltmann/orquestra%C3%A7%C3%A3o-vs-coreografia-em-eda-8c14db455892)
 
 ## Citações interessantes
 
-### Interfaces de microserviços
+### Interfaces de microsserviços
 
-> Normalmente, os microserviços possuem interfaces de comunicação de entrada e saída. Como exemplo podemos REST APIs (síncronas) ou o processamento e geração de eventos (assíncronas).
+> Normalmente, os microsserviços possuem interfaces de comunicação de entrada e saída. Como exemplo podemos REST APIs (síncronas) ou o processamento e geração de eventos (assíncronas).
 
 É interessante sempre pensar em um serviço como um escopo delimitado de processos, os quais são acessados por meio de APIs pré-definidas. Dessa forma, o processamento de eventos se torna apenas mais uma interface de acesso, assim podendo ser instrumentalizado para compor serviços mais facilmente.
 
@@ -36,7 +36,7 @@ Uma vez que a orquestração dá ao microserviço a responsabilidade de gerir in
 
 ### Orquestração de eventos
 
-> Na orquestração, temos diferentes microserviços responsáveis por realizar uma parte de um processo de negócio. Cada microserviço então realiza esta etapa e não tem conhecimento dos demais componentes do sistema.
+> Na orquestração, temos diferentes microsserviços responsáveis por realizar uma parte de um processo de negócio. Cada microserviço então realiza esta etapa e não tem conhecimento dos demais componentes do sistema.
 
 O processamento de eventos é visto como uma "lógica de fluxos complexos", aonde uma entidade é responsável por exercer o papel do mediador e conhecer o fluxo, enquanto os demais exercem apenas o papel de atuadores sobre um escopo pré-determinado.
 
