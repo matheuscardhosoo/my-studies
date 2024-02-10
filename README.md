@@ -16,3 +16,10 @@
     - [x] [Neural Networks and Deep Learning](./courses/deeplearning_ai/neural_networks_and_deep_learning/index.md)
 
 ## Programming
+
+### [Articles](./programming/articles/index.md)
+
+- [ ] [Refactoring](./programming/articles/refactoring/index.md)
+    - [ ] Creational Patterns
+        - [x] [Abstract Factory](./programming/articles/refactoring/creational_patterns/abstract_factory/index.md)
+        - [x] [Factory Method](./programming/articles/refactoring/creational_patterns/factory_method/index.md)
