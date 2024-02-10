@@ -1,0 +1,1 @@
+# [Pattern: Saga](https://microservices.io/patterns/data/saga.html)
