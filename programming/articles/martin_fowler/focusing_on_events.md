@@ -1,0 +1,1 @@
+# [Focusing on Events](https://martinfowler.com/eaaDev/EventNarrative.html)
