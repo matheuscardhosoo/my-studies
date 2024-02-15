@@ -52,3 +52,7 @@
 ### Courses
 
 - [x] [The Complete Guide to Becoming a Software Architect](programming/courses/the_complete_guide_to_becoming_a_software_architect/index.md)
+
+### Small Topics
+
+- [x] [Reflection in Python](programming/small_topics/reflection_in_python.md)
