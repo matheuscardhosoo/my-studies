@@ -3,11 +3,11 @@
 
 ## Data Management
 
-### [Books](./books/index.md)
+### Books
 
 - [x] [NoSQL Distilled: A Brief Guide to the Emerging World of Polyglot Persistence](./books/nosql_distilled/nosql_distilled.md)
 
-### [Courses](./courses/index.md)
+### Courses
 
 - [ ] MongoDB Academy
     - [x] [Course 001: MongoDB Basics](./courses/mongodb_academy/m001_mongodb_basics/index.md)
@@ -17,7 +17,7 @@
 
 ## Programming
 
-### [Articles](./programming/articles/index.md)
+### Articles
 
 #### Google Cloud
 
@@ -49,6 +49,6 @@
     - [x] [Abstract Factory](./programming/articles/refactoring/creational_patterns/abstract_factory/index.md)
     - [x] [Factory Method](./programming/articles/refactoring/creational_patterns/factory_method/index.md)
 
-### [Courses](./programming/courses/index.md)
+### Courses
 
 - [x] [The Complete Guide to Becoming a Software Architect](programming/courses/the_complete_guide_to_becoming_a_software_architect/index.md)
